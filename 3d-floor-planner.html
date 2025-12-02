@@ -588,6 +588,91 @@
                                 leg.castShadow = true;
                                 group.add(leg);
                             });
+                    } else if (item.type.includes('bookshelf')) {
+                        const thickness = 2;
+                        const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
+
+                        // Back
+                        const backGeom = new THREE.BoxGeometry(width, height, thickness);
+                        const back = new THREE.Mesh(backGeom, mat);
+                        back.position.set(0, height / 2, -depth / 2 + thickness / 2);
+                        back.castShadow = true;
+                        group.add(back);
+
+                        // Sides
+                        const sideGeom = new THREE.BoxGeometry(thickness, height, depth);
+                        const left = new THREE.Mesh(sideGeom, mat);
+                        left.position.set(-width / 2 + thickness / 2, height / 2, 0);
+                        left.castShadow = true;
+                        group.add(left);
+
+                        const right = new THREE.Mesh(sideGeom, mat);
+                        right.position.set(width / 2 - thickness / 2, height / 2, 0);
+                        right.castShadow = true;
+                        group.add(right);
+
+                        // Shelves
+                        const shelfCount = 6;
+                        const shelfGeom = new THREE.BoxGeometry(width - thickness * 2, thickness, depth - thickness);
+                        for (let i = 0; i < shelfCount; i++) {
+                            const shelf = new THREE.Mesh(shelfGeom, mat);
+                            const posY = (height - thickness) * (i / (shelfCount - 1)) + thickness / 2;
+                            shelf.position.set(0, posY, thickness / 2);
+                            shelf.castShadow = true;
+                            group.add(shelf);
+                        }
+                    } else if (item.type.includes('fridge')) {
+                        // Body
+                        const bodyGeom = new THREE.BoxGeometry(width, height, depth - 5);
+                        const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.2, metalness: 0.1 });
+                        const body = new THREE.Mesh(bodyGeom, bodyMat);
+                        body.position.set(0, height / 2, -2.5);
+                        body.castShadow = true;
+                        group.add(body);
+
+                        // Doors
+                        const doorDepth = 5;
+                        const doorGap = 0.5;
+
+                        if (item.type === 'fridge_double') {
+                            const doorWidth = (width - doorGap) / 2;
+                            const doorGeom = new THREE.BoxGeometry(doorWidth, height, doorDepth);
+
+                            const leftDoor = new THREE.Mesh(doorGeom, bodyMat);
+                            leftDoor.position.set(-width / 4 - doorGap / 4, height / 2, depth / 2 - doorDepth / 2);
+                            leftDoor.castShadow = true;
+                            group.add(leftDoor);
+
+                            const rightDoor = new THREE.Mesh(doorGeom, bodyMat);
+                            rightDoor.position.set(width / 4 + doorGap / 4, height / 2, depth / 2 - doorDepth / 2);
+                            rightDoor.castShadow = true;
+                            group.add(rightDoor);
+
+                            // Handles
+                            const handleGeom = new THREE.BoxGeometry(2, 40, 2);
+                            const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.1, metalness: 0.8 });
+
+                            const leftHandle = new THREE.Mesh(handleGeom, handleMat);
+                            leftHandle.position.set(-5, height / 2, depth / 2 + 1);
+                            group.add(leftHandle);
+
+                            const rightHandle = new THREE.Mesh(handleGeom, handleMat);
+                            rightHandle.position.set(5, height / 2, depth / 2 + 1);
+                            group.add(rightHandle);
+                        } else {
+                            const doorGeom = new THREE.BoxGeometry(width, height, doorDepth);
+                            const door = new THREE.Mesh(doorGeom, bodyMat);
+                            door.position.set(0, height / 2, depth / 2 - doorDepth / 2);
+                            door.castShadow = true;
+                            group.add(door);
+
+                            // Handle
+                            const handleGeom = new THREE.BoxGeometry(2, 40, 2);
+                            const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.1, metalness: 0.8 });
+                            const handle = new THREE.Mesh(handleGeom, handleMat);
+                            handle.position.set(-width / 2 + 10, height / 2, depth / 2 + 1);
+                            group.add(handle);
+                        }
                     }
                     scene.add(group);
                 });
