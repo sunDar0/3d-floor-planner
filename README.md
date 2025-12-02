@@ -1,7 +1,7 @@
 # Simple Floor Planner (Floor Planner Pro)
 
 웹 브라우저에서 바로 실행 가능한 3D 평면도 에디터입니다. 별도의 설치 없이 HTML 파일 하나로 2D 도면 작성부터 3D 1인칭 관람까지 가능합니다.
-
+## 데모 주소: [페이지 이동](https://sundar0.github.io/3d-floor-planner/)
 ## ✨ 주요 기능
 
 ### 1. 2D 도면 편집 (2D Editor)
