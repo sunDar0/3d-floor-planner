@@ -39,7 +39,8 @@
         const { OrbitControls, PointerLockControls } = THREE;
 
         // 설정 값
-        const GRID_SIZE = 1; // 1cm 격자
+        const GRID_SIZE = 1; // 1cm 단위 이동 (정밀함)
+        const VISUAL_GRID_SIZE = 5; // 5cm 격자 표시
         const WALL_THICKNESS = 15; // 15cm 벽 두께
         const WALL_HEIGHT = 240; // 2.4m 벽 높이
         const DOOR_WIDTH = 90; // 90cm 문 폭
@@ -59,7 +60,7 @@
             { id: 'room', icon: '⬛', label: '방(바닥)' },
             { id: 'door', icon: '🚪', label: '문' },
             { id: 'window', icon: '🪟', label: '창문' },
-            { id: 'balcony', icon: '🪟', label: '발코니' },
+            { id: 'balcony', icon: '🪟🪟', label: '발코니' },
         ];
 
         const FURNITURE_TOOLS = [
@@ -1183,6 +1184,16 @@
                     r.points.forEach(p => points.push(p));
                 });
 
+                // 1. Vertex Snapping (점 스냅) - 가장 강력한 스냅
+                // 기존 점에 가까우면 그 점으로 강제 이동 (줌 아웃 상태에서도 쉽게 연결 가능)
+                for (const p of points) {
+                    const dist = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
+                    if (dist < SNAP_DIST) {
+                        return { x: p.x, y: p.y, guides: [] }; // 가이드 없이 바로 스냅
+                    }
+                }
+
+                // 2. Alignment Snapping (정렬 스냅)
                 // X축 스냅 (수직선 가이드) - 다른 점의 X좌표와 일치
                 for (const p of points) {
                     if (Math.abs(p.x - x) < SNAP_DIST) {
@@ -1227,20 +1238,20 @@
                 ctx.scale(scale, scale);
 
                 // 그리드 그리기
-                const startX = Math.floor(-pan.x / scale / GRID_SIZE) * GRID_SIZE;
-                const startY = Math.floor(-pan.y / scale / GRID_SIZE) * GRID_SIZE;
-                const endX = startX + (canvas.width / scale) + GRID_SIZE;
-                const endY = startY + (canvas.height / scale) + GRID_SIZE;
+                const startX = Math.floor(-pan.x / scale / VISUAL_GRID_SIZE) * VISUAL_GRID_SIZE;
+                const startY = Math.floor(-pan.y / scale / VISUAL_GRID_SIZE) * VISUAL_GRID_SIZE;
+                const endX = startX + (canvas.width / scale) + VISUAL_GRID_SIZE;
+                const endY = startY + (canvas.height / scale) + VISUAL_GRID_SIZE;
 
                 ctx.beginPath();
                 ctx.strokeStyle = "#e5e7eb";
                 ctx.lineWidth = 1 / scale;
 
-                for (let x = startX; x <= endX; x += GRID_SIZE) {
+                for (let x = startX; x <= endX; x += VISUAL_GRID_SIZE) {
                     ctx.moveTo(x, startY);
                     ctx.lineTo(x, endY);
                 }
-                for (let y = startY; y <= endY; y += GRID_SIZE) {
+                for (let y = startY; y <= endY; y += VISUAL_GRID_SIZE) {
                     ctx.moveTo(startX, y);
                     ctx.lineTo(endX, y);
                 }
@@ -1518,8 +1529,10 @@
                 }
 
                 const worldPos = screenToWorld(e.clientX, e.clientY);
-                const x = snapToGrid(worldPos.x);
-                const y = snapToGrid(worldPos.y);
+                // 마우스 다운 시에도 스냅 적용 (시작점 스냅)
+                const snapped = getSnappedPosition(worldPos.x, worldPos.y);
+                const x = snapped.x;
+                const y = snapped.y;
 
                 if (tool === 'select') {
                     // 가구 선택 로직 (MouseDown에서 처리)
