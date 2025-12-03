@@ -74,6 +74,9 @@
             { id: 'bookshelf_100', icon: '📚', label: '책장(100)' },
             { id: 'fridge_double', icon: '🧊', label: '냉장고(양)' },
             { id: 'fridge_single', icon: '❄️', label: '냉장고(단)' },
+            { id: 'dining_table_4p', icon: '🍽️', label: '식탁(4인)' },
+            { id: 'dining_table_6p', icon: '🍽️', label: '식탁(6인)' },
+            { id: 'tv_stand', icon: '📺', label: 'TV장' },
         ];
 
         const FURNITURE_TEMPLATES = {
@@ -87,6 +90,9 @@
             'bookshelf_100': { label: '책장 100', width: 100, depth: 30, height: 200, color: 0x8b4513 },
             'fridge_double': { label: '냉장고(양문)', width: 95, depth: 90, height: 185, color: 0xe5e7eb },
             'fridge_single': { label: '냉장고(단문)', width: 60, depth: 70, height: 185, color: 0xe5e7eb },
+            'dining_table_4p': { label: '식탁 4인', width: 120, depth: 80, height: 75, color: 0xd4a373 },
+            'dining_table_6p': { label: '식탁 6인', width: 180, depth: 80, height: 75, color: 0xd4a373 },
+            'tv_stand': { label: 'TV장', width: 180, depth: 40, height: 45, color: 0x8d6e63 },
         };
 
         // 유틸리티
@@ -226,6 +232,7 @@
             const controlsRef = useRef(null);
             const fpvControlsRef = useRef(null);
             const requestRef = useRef(null);
+            const doorsRef = useRef([]); // 문 애니메이션을 위한 참조
 
             // Movement state
             const moveState = useRef({
@@ -308,6 +315,7 @@
                 if (!mountRef.current) return;
 
                 // Scene Setup
+                doorsRef.current = []; // 초기화
                 const scene = new THREE.Scene();
                 scene.background = new THREE.Color(0xe0f2fe); // 하늘색 배경
                 scene.fog = new THREE.Fog(0xe0f2fe, 500, 3000); // 안개 효과로 깊이감 추가
@@ -457,40 +465,121 @@
                             }
 
                             if (op.type === 'door') {
+                                // 경첩(Pivot) 역할을 할 그룹 생성
+                                const doorPivot = new THREE.Group();
+                                doorPivot.position.set(start, 0, 0); // 오프닝의 시작점(왼쪽)을 경첩 위치로
+
                                 const doorGeom = new THREE.BoxGeometry(opWidth, opHeight, 5);
                                 const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 });
                                 const door = new THREE.Mesh(doorGeom, doorMat);
-                                door.position.set(opPos, opHeight / 2, 0);
-                                door.rotation.y = Math.PI / 6;
-                                door.position.z = -10;
+
+                                // 피벗 기준 문 위치 조정 (문의 왼쪽 끝이 피벗에 오도록 중심 이동)
+                                door.position.set(opWidth / 2, opHeight / 2, 0);
                                 door.castShadow = true;
-                                wallGroup.add(door);
+
+                                // 손잡이 추가
+                                const handleGeom = new THREE.SphereGeometry(3);
+                                const handleMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
+                                const handle = new THREE.Mesh(handleGeom, handleMat);
+                                // 손잡이 위치 수정: 높이는 중앙(0), 가로는 끝쪽(opWidth/2 - 10)
+                                handle.position.set(opWidth / 2 - 10, 0, 5);
+                                door.add(handle);
+                                const handle2 = handle.clone();
+                                handle2.position.z = -5;
+                                door.add(handle2);
+
+                                doorPivot.add(door);
+                                wallGroup.add(doorPivot);
+
+                                // 애니메이션을 위해 참조 저장
+                                doorsRef.current.push({
+                                    pivot: doorPivot,
+                                    width: opWidth
+                                });
                             } else if (op.type === 'balcony') {
                                 // 발코니 창 (유리)
                                 const winGeom = new THREE.BoxGeometry(opWidth, opHeight, 2);
                                 const winMat = new THREE.MeshPhysicalMaterial({
-                                    color: 0x87ceeb,
+                                    color: 0xa7d3ef, // 조금 더 진한 하늘색
                                     transparent: true,
-                                    opacity: 0.3,
+                                    opacity: 0.6, // 투명도 감소 (더 잘 보이게)
                                     metalness: 0.1,
-                                    roughness: 0,
-                                    transmission: 0.9
+                                    roughness: 0.1,
+                                    transmission: 0.2 // 투과율 감소
                                 });
                                 const win = new THREE.Mesh(winGeom, winMat);
                                 win.position.set(opPos, opHeight / 2, 0);
+
+                                // 프레임 추가 (테두리)
+                                const frameGeom = new THREE.BoxGeometry(opWidth + 4, opHeight + 4, 4);
+                                const frameMat = new THREE.MeshStandardMaterial({ color: 0x333333 }); // 짙은 회색 프레임
+                                // 프레임은 속이 비어있어야 하므로 4개의 막대로 구성하거나, 간단히 뒤에 덧대기보다는...
+                                // 여기서는 간단히 유리만 더 잘 보이게 처리하고, 프레임은 생략하거나 간단한 띠로 표현
+
+                                // 간단한 프레임 (상하좌우)
+                                const frameThick = 4;
+                                const frameDepth = 6;
+                                const frameGroup = new THREE.Group();
+                                frameGroup.position.set(opPos, opHeight / 2, 0);
+
+                                // 상
+                                const topFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
+                                topFrame.position.y = opHeight / 2 - frameThick / 2;
+                                frameGroup.add(topFrame);
+                                // 하
+                                const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
+                                bottomFrame.position.y = -opHeight / 2 + frameThick / 2;
+                                frameGroup.add(bottomFrame);
+                                // 좌
+                                const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
+                                leftFrame.position.x = -opWidth / 2 + frameThick / 2;
+                                frameGroup.add(leftFrame);
+                                // 우
+                                const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
+                                rightFrame.position.x = opWidth / 2 - frameThick / 2;
+                                frameGroup.add(rightFrame);
+
+                                wallGroup.add(frameGroup);
                                 wallGroup.add(win);
+
                             } else {
                                 const winGeom = new THREE.BoxGeometry(opWidth, opHeight, 2);
                                 const winMat = new THREE.MeshPhysicalMaterial({
-                                    color: 0x87ceeb,
+                                    color: 0xa7d3ef,
                                     transparent: true,
-                                    opacity: 0.5,
+                                    opacity: 0.6,
                                     metalness: 0.1,
-                                    roughness: 0,
-                                    transmission: 0.9
+                                    roughness: 0.1,
+                                    transmission: 0.2
                                 });
                                 const win = new THREE.Mesh(winGeom, winMat);
                                 win.position.set(opPos, opY + opHeight / 2, 0);
+
+                                // 창문 프레임
+                                const frameThick = 4;
+                                const frameDepth = 6;
+                                const frameMat = new THREE.MeshStandardMaterial({ color: 0xffffff }); // 흰색 프레임
+                                const frameGroup = new THREE.Group();
+                                frameGroup.position.set(opPos, opY + opHeight / 2, 0);
+
+                                // 상
+                                const topFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
+                                topFrame.position.y = opHeight / 2 - frameThick / 2;
+                                frameGroup.add(topFrame);
+                                // 하
+                                const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
+                                bottomFrame.position.y = -opHeight / 2 + frameThick / 2;
+                                frameGroup.add(bottomFrame);
+                                // 좌
+                                const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
+                                leftFrame.position.x = -opWidth / 2 + frameThick / 2;
+                                frameGroup.add(leftFrame);
+                                // 우
+                                const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
+                                rightFrame.position.x = opWidth / 2 - frameThick / 2;
+                                frameGroup.add(rightFrame);
+
+                                wallGroup.add(frameGroup);
                                 wallGroup.add(win);
                             }
                             currentPos = end;
@@ -589,6 +678,59 @@
                                 leg.castShadow = true;
                                 group.add(leg);
                             });
+
+                        // 의자 추가
+                        const chairGroup = new THREE.Group();
+                        const chairWidth = 45;
+                        const chairDepth = 45;
+                        const chairHeight = 45;
+
+                        // 책상 앞쪽에 배치
+                        chairGroup.position.set(0, 0, depth / 2 + 20);
+                        chairGroup.rotation.y = Math.PI; // 책상을 바라보게
+
+                        // 좌판
+                        const seat = new THREE.Mesh(
+                            new THREE.BoxGeometry(chairWidth, 5, chairDepth),
+                            new THREE.MeshStandardMaterial({ color: 0x4b5563 }) // 다크 그레이
+                        );
+                        seat.position.y = chairHeight - 2.5;
+                        seat.castShadow = true;
+                        chairGroup.add(seat);
+
+                        // 다리 (오피스 체어 스타일)
+                        const poleGeom = new THREE.BoxGeometry(5, chairHeight - 10, 5);
+                        const pole = new THREE.Mesh(poleGeom, new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
+                        pole.position.y = (chairHeight - 10) / 2;
+                        chairGroup.add(pole);
+
+                        const baseGeom = new THREE.BoxGeometry(35, 5, 35);
+                        const base = new THREE.Mesh(baseGeom, new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
+                        base.position.y = 2.5;
+                        chairGroup.add(base);
+
+                        // 등받이
+                        const back = new THREE.Mesh(
+                            new THREE.BoxGeometry(chairWidth, 45, 5),
+                            new THREE.MeshStandardMaterial({ color: 0x4b5563 })
+                        );
+                        back.position.set(0, chairHeight + 22.5, -chairDepth / 2 + 2.5);
+                        back.castShadow = true;
+                        chairGroup.add(back);
+
+                        // 팔걸이
+                        const armGeom = new THREE.BoxGeometry(5, 20, 30);
+                        const armMat = new THREE.MeshStandardMaterial({ color: 0x1f2937 });
+
+                        const leftArm = new THREE.Mesh(armGeom, armMat);
+                        leftArm.position.set(-chairWidth / 2 + 2.5, chairHeight + 10, 0);
+                        chairGroup.add(leftArm);
+
+                        const rightArm = new THREE.Mesh(armGeom, armMat);
+                        rightArm.position.set(chairWidth / 2 - 2.5, chairHeight + 10, 0);
+                        chairGroup.add(rightArm);
+
+                        group.add(chairGroup);
                     } else if (item.type.includes('bookshelf')) {
                         const thickness = 2;
                         const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
@@ -667,13 +809,142 @@
                             door.castShadow = true;
                             group.add(door);
 
-                            // Handle
-                            const handleGeom = new THREE.BoxGeometry(2, 40, 2);
-                            const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.1, metalness: 0.8 });
                             const handle = new THREE.Mesh(handleGeom, handleMat);
                             handle.position.set(-width / 2 + 10, height / 2, depth / 2 + 1);
                             group.add(handle);
                         }
+                    } else if (item.type.includes('dining_table')) {
+                        // 상판
+                        const topGeom = new THREE.BoxGeometry(width, 4, depth);
+                        const topMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
+                        const top = new THREE.Mesh(topGeom, topMat);
+                        top.position.y = height - 2;
+                        top.castShadow = true;
+                        group.add(top);
+
+                        // 다리 (4개)
+                        const legGeom = new THREE.BoxGeometry(6, height - 4, 6);
+                        const legMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
+                        const legPos = [
+                            { x: -width / 2 + 10, z: -depth / 2 + 10 },
+                            { x: width / 2 - 10, z: -depth / 2 + 10 },
+                            { x: -width / 2 + 10, z: depth / 2 - 10 },
+                            { x: width / 2 - 10, z: depth / 2 - 10 }
+                        ];
+                        legPos.forEach(pos => {
+                            const leg = new THREE.Mesh(legGeom, legMat);
+                            leg.position.set(pos.x, (height - 4) / 2, pos.z);
+                            leg.castShadow = true;
+                            group.add(leg);
+                        });
+
+                        // 의자 (간단하게 큐브로 표현하거나 등받이 있는 형태)
+                        const chairWidth = 40;
+                        const chairDepth = 40;
+                        const chairHeight = 45;
+
+                        const chairCountSide = item.type === 'dining_table_6p' ? 3 : 2;
+                        const spacing = width / chairCountSide;
+
+                        for (let side = -1; side <= 1; side += 2) { // 양쪽 (-1, 1)
+                            for (let i = 0; i < chairCountSide; i++) {
+                                const chairGroup = new THREE.Group();
+                                // 위치 계산: 중앙 정렬
+                                const x = -width / 2 + spacing / 2 + i * spacing;
+                                const z = side * (depth / 2 + 20); // 테이블에서 약간 떨어짐
+
+                                chairGroup.position.set(x, 0, z);
+                                // 회전: 테이블을 바라보게
+                                chairGroup.rotation.y = side === 1 ? Math.PI : 0;
+
+                                // 좌판
+                                const seat = new THREE.Mesh(
+                                    new THREE.BoxGeometry(chairWidth, 5, chairDepth),
+                                    new THREE.MeshStandardMaterial({ color: 0xa1887f })
+                                );
+                                seat.position.y = chairHeight - 2.5;
+                                seat.castShadow = true;
+                                chairGroup.add(seat);
+
+                                // 다리
+                                const cLegGeom = new THREE.BoxGeometry(4, chairHeight - 5, 4);
+                                const cLegs = [
+                                    { x: -15, z: -15 }, { x: 15, z: -15 },
+                                    { x: -15, z: 15 }, { x: 15, z: 15 }
+                                ];
+                                cLegs.forEach(p => {
+                                    const l = new THREE.Mesh(cLegGeom, new THREE.MeshStandardMaterial({ color: 0x8d6e63 }));
+                                    l.position.set(p.x, (chairHeight - 5) / 2, p.z);
+                                    chairGroup.add(l);
+                                });
+
+                                // 등받이
+                                const back = new THREE.Mesh(
+                                    new THREE.BoxGeometry(chairWidth, 40, 5),
+                                    new THREE.MeshStandardMaterial({ color: 0xa1887f })
+                                );
+                                back.position.set(0, chairHeight + 20, -chairDepth / 2 + 2.5);
+                                back.castShadow = true;
+                                chairGroup.add(back);
+
+                                group.add(chairGroup);
+                            }
+                        }
+
+                    } else if (item.type === 'tv_stand') {
+                        // 본체
+                        const bodyGeom = new THREE.BoxGeometry(width, height - 10, depth);
+                        const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
+                        const body = new THREE.Mesh(bodyGeom, bodyMat);
+                        body.position.y = (height - 10) / 2 + 10;
+                        body.castShadow = true;
+                        group.add(body);
+
+                        // 다리
+                        const legGeom = new THREE.BoxGeometry(5, 10, 5);
+                        const legPos = [
+                            { x: -width / 2 + 10, z: -depth / 2 + 10 },
+                            { x: width / 2 - 10, z: -depth / 2 + 10 },
+                            { x: -width / 2 + 10, z: depth / 2 - 10 },
+                            { x: width / 2 - 10, z: depth / 2 - 10 }
+                        ];
+                        legPos.forEach(pos => {
+                            const leg = new THREE.Mesh(legGeom, bodyMat);
+                            leg.position.set(pos.x, 5, pos.z);
+                            leg.castShadow = true;
+                            group.add(leg);
+                        });
+
+                        // 서랍/문 디테일
+                        const drawerGeom = new THREE.BoxGeometry(width / 3 - 4, height - 20, 2);
+                        const drawerMat = new THREE.MeshStandardMaterial({ color: 0x795548 });
+                        for (let i = -1; i <= 1; i++) {
+                            const drawer = new THREE.Mesh(drawerGeom, drawerMat);
+                            drawer.position.set(i * (width / 3), (height - 10) / 2 + 10, depth / 2 + 1);
+                            group.add(drawer);
+                        }
+
+                        // TV
+                        const tvWidth = 140;
+                        const tvHeight = 80;
+                        const tvDepth = 5;
+                        const tvGeom = new THREE.BoxGeometry(tvWidth, tvHeight, tvDepth);
+                        const tvMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
+                        const tv = new THREE.Mesh(tvGeom, tvMat);
+                        tv.position.set(0, height + tvHeight / 2, 0);
+                        tv.castShadow = true;
+                        group.add(tv);
+
+                        // TV 받침대
+                        const standGeom = new THREE.BoxGeometry(40, 5, 20);
+                        const stand = new THREE.Mesh(standGeom, tvMat);
+                        stand.position.set(0, height + 2.5, 0);
+                        group.add(stand);
+
+                        const neckGeom = new THREE.BoxGeometry(10, 10, 5);
+                        const neck = new THREE.Mesh(neckGeom, tvMat);
+                        neck.position.set(0, height + 7.5, 0);
+                        group.add(neck);
                     }
                     scene.add(group);
                 });
@@ -746,6 +1017,48 @@
                         camera.position.y = h;
                     } else {
                         orbitControls.update();
+                    }
+
+                    // 문 애니메이션 (자동 열림/닫힘)
+                    if (doorsRef.current.length > 0) {
+                        const playerPos = camera.position;
+                        doorsRef.current.forEach(door => {
+                            const worldPos = new THREE.Vector3();
+                            door.pivot.getWorldPosition(worldPos);
+
+                            // 높이 차이는 무시하고 수평 거리만 계산
+                            const dist = Math.sqrt(Math.pow(playerPos.x - worldPos.x, 2) + Math.pow(playerPos.z - worldPos.z, 2));
+
+                            // 히스테리시스 적용 (열림: 150cm, 닫힘: 250cm)
+                            const OPEN_DIST = 150;
+                            const CLOSE_DIST = 250;
+
+                            // 상태 초기화
+                            if (door.targetAngle === undefined) door.targetAngle = 0;
+                            if (door.isOpen === undefined) door.isOpen = false;
+
+                            if (dist < OPEN_DIST) {
+                                if (!door.isOpen) {
+                                    // 처음 열릴 때 방향 결정
+                                    const doorDir = new THREE.Vector3(0, 0, 1); // 문의 로컬 정면 (Z축)
+                                    doorDir.applyQuaternion(door.pivot.getWorldQuaternion(new THREE.Quaternion()));
+
+                                    const toPlayer = new THREE.Vector3().subVectors(playerPos, worldPos).normalize();
+                                    const dot = doorDir.dot(toPlayer);
+
+                                    // 플레이어가 정면(dot > 0)에 있으면 뒤로(-Z방향, +90도) 열림 (Push)
+                                    // 플레이어가 후면(dot < 0)에 있으면 앞으로(+Z방향, -90도) 열림 (Push)
+                                    door.targetAngle = dot > 0 ? Math.PI / 2 : -Math.PI / 2;
+                                    door.isOpen = true;
+                                }
+                            } else if (dist > CLOSE_DIST) {
+                                door.targetAngle = 0;
+                                door.isOpen = false;
+                            }
+
+                            // 부드럽게 회전 (Lerp 속도 조절: 0.1 -> 0.05)
+                            door.pivot.rotation.y = THREE.MathUtils.lerp(door.pivot.rotation.y, door.targetAngle, 0.05);
+                        });
                     }
 
                     renderer.render(scene, camera);
