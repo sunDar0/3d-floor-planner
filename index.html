@@ -216,6 +216,31 @@
             texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(2, 1);
             return texture;
+            return texture;
+        };
+
+        const createCeilingTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            // 흰색 텍스처 (약간의 질감)
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, 512, 512);
+
+            // 미세한 노이즈
+            for (let i = 0; i < 10000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#f1f5f9';
+                ctx.globalAlpha = 0.3;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
+            return texture;
         };
 
         // --- 3D 뷰어 컴포넌트 ---
@@ -233,6 +258,7 @@
             const fpvControlsRef = useRef(null);
             const requestRef = useRef(null);
             const doorsRef = useRef([]); // 문 애니메이션을 위한 참조
+            const ceilingsRef = useRef([]); // 천장 메쉬 참조
 
             // Movement state
             const moveState = useRef({
@@ -260,6 +286,13 @@
                 roughness: 0.9,
                 color: 0xffffff
             }), [wallTexture]);
+
+            const ceilingTexture = useMemo(() => createCeilingTexture(), []);
+            const ceilingMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+                map: ceilingTexture,
+                roughness: 0.9,
+                side: THREE.DoubleSide // 양면 렌더링 (위에서 봐도, 아래서 봐도)
+            }), [ceilingTexture]);
 
             // 충돌 감지 함수
             const checkCollision = (x, z) => {
@@ -316,6 +349,7 @@
 
                 // Scene Setup
                 doorsRef.current = []; // 초기화
+                ceilingsRef.current = []; // 초기화
                 const scene = new THREE.Scene();
                 scene.background = new THREE.Color(0xe0f2fe); // 하늘색 배경
                 scene.fog = new THREE.Fog(0xe0f2fe, 500, 3000); // 안개 효과로 깊이감 추가
@@ -399,6 +433,25 @@
                     mesh.position.y = 0.5;
                     mesh.receiveShadow = true;
                     scene.add(mesh);
+
+
+                    // 천장 생성 (Smart Ceiling)
+                    const ceilingGeom = new THREE.ShapeGeometry(shape);
+                    // UV 매핑
+                    const cPosAttribute = ceilingGeom.attributes.position;
+                    const cUvAttribute = ceilingGeom.attributes.uv;
+                    for (let i = 0; i < cPosAttribute.count; i++) {
+                        const x = cPosAttribute.getX(i);
+                        const y = cPosAttribute.getY(i);
+                        cUvAttribute.setXY(i, x / 500, y / 500);
+                    }
+
+                    const ceilingMesh = new THREE.Mesh(ceilingGeom, ceilingMaterial);
+                    ceilingMesh.rotation.x = Math.PI / 2; // 바닥과 같은 방향 (뒤집힘 주의)
+                    ceilingMesh.position.y = WALL_HEIGHT; // 벽 높이에 배치
+                    ceilingMesh.visible = false; // 기본적으로 숨김 (FPV에서만 표시)
+                    scene.add(ceilingMesh);
+                    ceilingsRef.current.push(ceilingMesh);
                 });
 
                 walls.forEach((wall, index) => {
@@ -1015,8 +1068,18 @@
                         // 3. 높이 고정 (비행/땅파기 방지)
                         const h = gender === 'male' ? HEIGHT_MALE : HEIGHT_FEMALE;
                         camera.position.y = h;
+
+                        // FPV 모드일 때 천장 보이기
+                        if (ceilingsRef.current.length > 0 && !ceilingsRef.current[0].visible) {
+                            ceilingsRef.current.forEach(c => c.visible = true);
+                        }
                     } else {
                         orbitControls.update();
+
+                        // Orbit 모드일 때 천장 숨기기
+                        if (ceilingsRef.current.length > 0 && ceilingsRef.current[0].visible) {
+                            ceilingsRef.current.forEach(c => c.visible = false);
+                        }
                     }
 
                     // 문 애니메이션 (자동 열림/닫힘)
