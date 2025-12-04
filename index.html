@@ -39,7 +39,7 @@
       GRID_SIZE, VISUAL_GRID_SIZE, WALL_THICKNESS, WALL_HEIGHT,
       DOOR_WIDTH, DOOR_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_SILL,
       BALCONY_WIDTH, BALCONY_HEIGHT, HEIGHT_MALE, HEIGHT_FEMALE,
-      TOOLS, FURNITURE_TOOLS, FURNITURE_TEMPLATES
+      TOOLS, FURNITURE_CATEGORIES, FURNITURE_TEMPLATES
     } from './src/config/constants.js';
 
     import { snapToGrid, distance, projectPointOnLine } from './src/utils/geometry.js';
@@ -443,6 +443,34 @@
 
     // --- 툴바 컴포넌트 ---
     const Toolbar = ({ tool, setTool, undo, redo, canUndo, canRedo, clearAll, mode, setMode, handleFileDownload, handleFileUpload }) => {
+      const [openCategory, setOpenCategory] = useState(null);
+      const toolbarRef = useRef(null);
+
+      useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (toolbarRef.current && !toolbarRef.current.contains(event.target)) {
+                setOpenCategory(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+      }, [toolbarRef]);
+
+      const handleCategoryClick = (key, category) => {
+        if (category.isDirect) {
+            setTool(category.items[0].id);
+            setOpenCategory(null);
+        } else {
+            setOpenCategory(openCategory === key ? null : key);
+        }
+      };
+
+      const handleItemClick = (id) => {
+          setTool(id);
+          setOpenCategory(null);
+      };
 
       return (
         <div className="bg-white/90 backdrop-blur-md border-b border-gray-200 p-4 flex justify-between items-center shadow-sm z-10 h-[80px]">
@@ -452,7 +480,7 @@
             </h1>
 
             {/* 메인 툴바 */}
-            <div className="flex bg-gray-100/50 p-1.5 rounded-xl space-x-1 border border-gray-200">
+            <div ref={toolbarRef} className="flex bg-gray-100/50 p-1.5 rounded-xl space-x-1 border border-gray-200">
               {TOOLS.map(t => (
                 <button
                   key={t.id}
@@ -468,18 +496,41 @@
               ))}
               <div className="w-px h-6 bg-gray-300 mx-2 self-center"></div>
               {/* 가구 툴바 */}
-              {FURNITURE_TOOLS.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setTool(tool === t.id ? 'select' : t.id)}
-                  className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-10 h-10 ${tool === t.id
-                    ? 'bg-white text-blue-600 shadow-md scale-105'
-                    : 'text-gray-600 hover:bg-gray-200/80 hover:text-gray-900'
-                    }`}
-                  title={t.label}
-                >
-                  <span className="text-lg leading-none">{t.icon}</span>
-                </button>
+              {Object.entries(FURNITURE_CATEGORIES).map(([key, category]) => (
+                <div key={key} className="relative">
+                    <button
+                        onClick={() => handleCategoryClick(key, category)}
+                        className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-10 h-10 ${
+                            (openCategory === key || (category.items.some(item => item.id === tool)))
+                                ? 'bg-white text-blue-600 shadow-md scale-105'
+                                : 'text-gray-600 hover:bg-gray-200/80 hover:text-gray-900'
+                        }`}
+                        title={category.label}
+                    >
+                        <span className="text-lg leading-none">{category.icon}</span>
+                    </button>
+                    {openCategory === key && !category.isDirect && (
+                        <div className="absolute top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-20 p-2">
+                            <div className="grid grid-cols-3 gap-2">
+                                {category.items.map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleItemClick(item.id)}
+                                        className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-full h-16 ${
+                                            tool === item.id
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                        title={item.label}
+                                    >
+                                        <span className="text-xl leading-none">{item.icon}</span>
+                                        <span className="text-[10px] mt-1">{item.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
               ))}
             </div>
 
@@ -604,6 +655,10 @@
       const [guides, setGuides] = useState([]); // [{ type: 'x'|'y', pos: number, start: number, end: number }]
 
       const canvasRef = useRef(null);
+
+      const allFurnitureTools = useMemo(() => {
+        return Object.values(FURNITURE_CATEGORIES).flatMap(category => category.items);
+      }, []);
 
       // 단축키 이벤트 핸들러
       useEffect(() => {
@@ -1070,9 +1125,9 @@
                 />
                 <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 max-w-xs transition-all duration-300 pointer-events-none z-20">
                   <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-2xl">{TOOLS.find(t => t.id === tool)?.icon || FURNITURE_TOOLS.find(t => t.id === tool)?.icon || '👆'}</span>
+                    <span className="text-2xl">{TOOLS.find(t => t.id === tool)?.icon || allFurnitureTools.find(t => t.id === tool)?.icon || '👆'}</span>
                     <h3 className="font-bold text-gray-800 text-sm">
-                      {TOOLS.find(t => t.id === tool)?.label || FURNITURE_TOOLS.find(t => t.id === tool)?.label || '선택 모드'}
+                      {TOOLS.find(t => t.id === tool)?.label || allFurnitureTools.find(t => t.id === tool)?.label || '선택 모드'}
                     </h3>
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed">
