@@ -29,33 +29,76 @@ export const TOOLS = [
     { id: 'balcony', icon: '🪟🪟', label: '발코니' },
 ];
 
-export const FURNITURE_TOOLS = [
-    { id: 'desk', icon: '🪑', label: '책상' },
-    { id: 'sofa_2p', icon: '🛋️', label: '소파(2)' },
-    { id: 'sofa_3p', icon: '🛋️', label: '소파(3)' },
-    { id: 'bed_single', icon: '🛏️', label: '침대(S)' },
-    { id: 'bed_queen', icon: '🛏️', label: '침대(Q)' },
-    { id: 'bed_king', icon: '🛏️', label: '침대(K)' },
-    { id: 'bookshelf_160', icon: '📚', label: '책장(160)' },
-    { id: 'bookshelf_100', icon: '📚', label: '책장(100)' },
-    { id: 'fridge_double', icon: '🧊', label: '냉장고(양)' },
-    { id: 'fridge_single', icon: '❄️', label: '냉장고(단)' },
-    { id: 'dining_table_4p', icon: '🍽️', label: '식탁(4인)' },
-    { id: 'dining_table_6p', icon: '🍽️', label: '식탁(6인)' },
-    { id: 'tv_stand', icon: '📺', label: 'TV장' },
-    { id: 'washer_top', icon: '🧺', label: '통돌이' },
-    { id: 'washer_front', icon: '🧼', label: '드럼세탁기' },
-    { id: 'dryer', icon: '🔥', label: '건조기' },
-    { id: 'wash_tower', icon: '🗼', label: '세탁건조기' },
-    { id: 'light_floor_living', icon: '💡', label: '거실등(형)' },
-    { id: 'light_floor_room', icon: '💡', label: '방등(형)' },
-    { id: 'light_floor_kitchen', icon: '💡', label: '주방등(형)' },
-    { id: 'light_led_living', icon: '✨', label: '거실등(LED)' },
-    { id: 'light_led_room', icon: '✨', label: '방등(LED)' },
-    { id: 'light_led_kitchen', icon: '✨', label: '주방등(LED)' },
-    { id: 'wardrobe', icon: '🚪', label: '옷장' },
-    { id: 'shoe_rack', icon: '👞', label: '신발장' },
-];
+export const FURNITURE_CATEGORIES = {
+    'sofa': {
+        icon: '🛋️',
+        label: '소파',
+        items: [
+            { id: 'sofa_2p', icon: '🛋️', label: '소파(2)' },
+            { id: 'sofa_3p', icon: '🛋️', label: '소파(3)' },
+        ]
+    },
+    'bed': {
+        icon: '🛏️',
+        label: '침대',
+        items: [
+            { id: 'bed_single', icon: '🛏️', label: '침대(S)' },
+            { id: 'bed_queen', icon: '🛏️', label: '침대(Q)' },
+            { id: 'bed_king', icon: '🛏️', label: '침대(K)' },
+        ]
+    },
+    'storage': {
+        icon: '📚',
+        label: '수납',
+        items: [
+            { id: 'bookshelf_160', icon: '📚', label: '책장(160)' },
+            { id: 'bookshelf_100', icon: '📚', label: '책장(100)' },
+            { id: 'tv_stand', icon: '📺', label: 'TV장' },
+            { id: 'wardrobe', icon: '🚪', label: '옷장' },
+            { id: 'shoe_rack', icon: '👞', label: '신발장' },
+        ]
+    },
+    'appliances': {
+        icon: '🔌',
+        label: '가전',
+        items: [
+            { id: 'fridge_double', icon: '🧊', label: '냉장고(양)' },
+            { id: 'fridge_single', icon: '❄️', label: '냉장고(단)' },
+            { id: 'washer_top', icon: '🧺', label: '통돌이' },
+            { id: 'washer_front', icon: '🧼', label: '드럼세탁기' },
+            { id: 'dryer', icon: '🔥', label: '건조기' },
+            { id: 'wash_tower', icon: '🗼', label: '세탁건조기' },
+        ]
+    },
+    'dining': {
+        icon: '🍽️',
+        label: '식탁',
+        items: [
+            { id: 'dining_table_4p', icon: '🍽️', label: '식탁(4인)' },
+            { id: 'dining_table_6p', icon: '🍽️', label: '식탁(6인)' },
+        ]
+    },
+    'lighting': {
+        icon: '💡',
+        label: '조명',
+        items: [
+            { id: 'light_floor_living', icon: '💡', label: '거실등(형)' },
+            { id: 'light_floor_room', icon: '💡', label: '방등(형)' },
+            { id: 'light_floor_kitchen', icon: '💡', label: '주방등(형)' },
+            { id: 'light_led_living', icon: '✨', label: '거실등(LED)' },
+            { id: 'light_led_room', icon: '✨', label: '방등(LED)' },
+            { id: 'light_led_kitchen', icon: '✨', label: '주방등(LED)' },
+        ]
+    },
+    'desk': {
+        icon: '🪑',
+        label: '책상',
+        isDirect: true, // 단일 아이템은 바로 선택되도록
+        items: [
+            { id: 'desk', icon: '🪑', label: '책상' },
+        ]
+    },
+};
 
 export const FURNITURE_TEMPLATES = {
     'desk': { label: '책상', width: 160, depth: 80, height: 75, color: 0x8b4513 },
