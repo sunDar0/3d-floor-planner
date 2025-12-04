@@ -34,214 +34,30 @@
 <body>
   <div id="root"></div>
 
-  <script type="text/babel">
+  <script type="text/babel" data-type="module">
+    import {
+      GRID_SIZE, VISUAL_GRID_SIZE, WALL_THICKNESS, WALL_HEIGHT,
+      DOOR_WIDTH, DOOR_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_SILL,
+      BALCONY_WIDTH, BALCONY_HEIGHT, HEIGHT_MALE, HEIGHT_FEMALE,
+      TOOLS, FURNITURE_TOOLS, FURNITURE_TEMPLATES
+    } from './src/config/constants.js';
+
+    import { snapToGrid, distance, projectPointOnLine } from './src/utils/geometry.js';
+    import { getSnappedPosition } from './src/utils/snap.js';
+    import { checkCollision } from './src/utils/collision.js';
+    import { createFloorTexture, createWallTexture, createCeilingTexture } from './src/rendering/textures.js';
+    import { drawRoom, drawWall, drawOpening, drawFurniture, drawGrid } from './src/rendering/canvas2d.js';
+    import { createRoomObjects, createWallObjects } from './src/rendering/sceneBuilder.js';
+    import { createFurnitureGroup } from './src/rendering/furnitureBuilder.js';
+    import { downloadFloorPlan, uploadFloorPlan } from './src/utils/fileHandler.js';
+    import { useHistory } from './src/hooks/useHistory.js';
+
     const { useState, useEffect, useRef, useMemo, useCallback } = React;
     const { OrbitControls, PointerLockControls } = THREE;
 
     // 설정 값
-    const GRID_SIZE = 1; // 1cm 단위 이동 (정밀함)
-    const VISUAL_GRID_SIZE = 5; // 5cm 격자 표시
-    const WALL_THICKNESS = 15; // 15cm 벽 두께
-    const WALL_HEIGHT = 240; // 2.4m 벽 높이
-    const DOOR_WIDTH = 90; // 90cm 문 폭
-    const DOOR_HEIGHT = 210; // 2.1m 문 높이
-    const WINDOW_WIDTH = 120; // 1.2m 창문 폭
-    const WINDOW_HEIGHT = 120; // 1.2m 창문 높이
-    const WINDOW_SILL = 90; // 창문 바닥에서 떨어진 높이 (90cm)
-    const BALCONY_WIDTH = 240; // 2.4m 발코니 창
-    const BALCONY_HEIGHT = 210; // 2.1m 발코니 높이
+    // 유틸리티 및 상수는 import 됨
 
-    const HEIGHT_MALE = 180;
-    const HEIGHT_FEMALE = 160;
-
-    const TOOLS = [
-      { id: 'select', icon: '👆', label: '선택' },
-      { id: 'wall', icon: '🧱', label: '벽' },
-      { id: 'room', icon: '⬛', label: '방(바닥)' },
-      { id: 'door', icon: '🚪', label: '문' },
-      { id: 'window', icon: '🪟', label: '창문' },
-      { id: 'balcony', icon: '🪟🪟', label: '발코니' },
-    ];
-
-    const FURNITURE_TOOLS = [
-      { id: 'desk', icon: '🪑', label: '책상' },
-      { id: 'sofa_2p', icon: '🛋️', label: '소파(2)' },
-      { id: 'sofa_3p', icon: '🛋️', label: '소파(3)' },
-      { id: 'bed_single', icon: '🛏️', label: '침대(S)' },
-      { id: 'bed_queen', icon: '🛏️', label: '침대(Q)' },
-      { id: 'bed_king', icon: '🛏️', label: '침대(K)' },
-      { id: 'bookshelf_160', icon: '📚', label: '책장(160)' },
-      { id: 'bookshelf_100', icon: '📚', label: '책장(100)' },
-      { id: 'fridge_double', icon: '🧊', label: '냉장고(양)' },
-      { id: 'fridge_single', icon: '❄️', label: '냉장고(단)' },
-      { id: 'dining_table_4p', icon: '🍽️', label: '식탁(4인)' },
-      { id: 'dining_table_6p', icon: '🍽️', label: '식탁(6인)' },
-      { id: 'tv_stand', icon: '📺', label: 'TV장' },
-    ];
-
-    const FURNITURE_TEMPLATES = {
-      'desk': { label: '책상', width: 160, depth: 80, height: 75, color: 0x8b4513 },
-      'sofa_2p': { label: '소파 2인', width: 160, depth: 80, height: 85, color: 0x9ca3af },
-      'sofa_3p': { label: '소파 3인', width: 210, depth: 80, height: 85, color: 0x9ca3af },
-      'bed_single': { label: '침대 S', width: 100, depth: 200, height: 50, color: 0xffffff },
-      'bed_queen': { label: '침대 Q', width: 150, depth: 200, height: 50, color: 0xffffff },
-      'bed_king': { label: '침대 K', width: 180, depth: 200, height: 50, color: 0xffffff },
-      'bookshelf_160': { label: '책장 160', width: 160, depth: 30, height: 200, color: 0x8b4513 },
-      'bookshelf_100': { label: '책장 100', width: 100, depth: 30, height: 200, color: 0x8b4513 },
-      'fridge_double': { label: '냉장고(양문)', width: 95, depth: 90, height: 185, color: 0xe5e7eb },
-      'fridge_single': { label: '냉장고(단문)', width: 60, depth: 70, height: 185, color: 0xe5e7eb },
-      'dining_table_4p': { label: '식탁 4인', width: 120, depth: 80, height: 75, color: 0xd4a373 },
-      'dining_table_6p': { label: '식탁 6인', width: 180, depth: 80, height: 75, color: 0xd4a373 },
-      'tv_stand': { label: 'TV장', width: 180, depth: 40, height: 45, color: 0x8d6e63 },
-    };
-
-    // 유틸리티
-    const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
-
-    const distance = (p1, p2) => Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-
-    // 점이 선분 위에 있는지 확인 (투영)
-    const projectPointOnLine = (point, start, end) => {
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const len2 = dx * dx + dy * dy;
-      if (len2 === 0) return start;
-
-      let t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / len2;
-      t = Math.max(0, Math.min(1, t));
-
-      return {
-        x: start.x + t * dx,
-        y: start.y + t * dy,
-        t: t // 비율 (0~1)
-      };
-    };
-
-    // --- 히스토리 관리 훅 ---
-    const useHistory = (initialState) => {
-      const [history, setHistory] = useState([initialState]);
-      const [currentIndex, setCurrentIndex] = useState(0);
-
-      // 상태 변경 (새로운 기록 추가)
-      const pushState = useCallback((newState) => {
-        setHistory(prevHistory => {
-          const upToCurrent = prevHistory.slice(0, currentIndex + 1);
-          return [...upToCurrent, newState];
-        });
-        setCurrentIndex(prev => prev + 1);
-      }, [currentIndex]);
-
-      // 실행 취소
-      const undo = useCallback(() => {
-        setCurrentIndex(prev => Math.max(0, prev - 1));
-      }, []);
-
-      // 다시 실행
-      const redo = useCallback(() => {
-        setHistory(prevHistory => {
-          setCurrentIndex(prev => Math.min(prevHistory.length - 1, prev + 1));
-          return prevHistory;
-        });
-      }, []);
-
-      // 초기화
-      const reset = useCallback((newState) => {
-        setHistory([newState]);
-        setCurrentIndex(0);
-      }, []);
-
-      return {
-        state: history[currentIndex],
-        pushState,
-        undo,
-        redo,
-        reset,
-        canUndo: currentIndex > 0,
-        canRedo: currentIndex < history.length - 1
-      };
-    };
-
-    // 텍스처 생성 유틸리티
-    const createFloorTexture = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-
-      // 베이스 컬러
-      ctx.fillStyle = '#e5d0b1';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // 나무 결 무늬
-      ctx.fillStyle = '#d4b895';
-      for (let i = 0; i < 20; i++) {
-        const y = i * (512 / 20);
-        ctx.fillRect(0, y, 512, 2); // 줄눈
-
-        // 나이테 느낌
-        for (let j = 0; j < 50; j++) {
-          ctx.globalAlpha = 0.1;
-          ctx.fillStyle = '#8b5a2b';
-          const x = Math.random() * 512;
-          const w = Math.random() * 100;
-          ctx.fillRect(x, y + 2, w, (512 / 20) - 4);
-        }
-      }
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(4, 4);
-      return texture;
-    };
-
-    const createWallTexture = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-
-      ctx.fillStyle = '#f3f4f6';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // 노이즈
-      for (let i = 0; i < 5000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#e5e7eb';
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
-      }
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(2, 1);
-      return texture;
-      return texture;
-    };
-
-    const createCeilingTexture = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-
-      // 흰색 텍스처 (약간의 질감)
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // 미세한 노이즈
-      for (let i = 0; i < 10000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#f1f5f9';
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
-      }
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(4, 4);
-      return texture;
-    };
 
     // --- 3D 뷰어 컴포넌트 ---
     const Viewer3D = ({ walls, rooms, openings, furniture = [] }) => {
@@ -294,54 +110,9 @@
         side: THREE.DoubleSide // 양면 렌더링 (위에서 봐도, 아래서 봐도)
       }), [ceilingTexture]);
 
-      // 충돌 감지 함수
-      const checkCollision = (x, z) => {
-        const PLAYER_RADIUS = 30; // 30cm 몸통 반지름
-        const THRESHOLD = WALL_THICKNESS / 2 + PLAYER_RADIUS;
-
-        // 오프셋 (중앙 정렬)
-        const offsetX = -window.innerWidth / 2;
-        const offsetZ = -window.innerHeight / 2;
-
-        const px = x - offsetX;
-        const pz = z - offsetZ;
-
-        for (let i = 0; i < walls.length; i++) {
-          const wall = walls[i];
-
-          const proj = projectPointOnLine({ x: px, y: pz }, wall.start, wall.end);
-          const dist = distance({ x: px, y: pz }, proj);
-
-          if (dist < THRESHOLD) {
-            // 벽과 충돌했으나, 문(오프닝)이 있는지 확인
-            const wallOpenings = openings.filter(o => o.wallIndex === i);
-
-            // 해당 벽의 오프닝들을 확인
-            const dx = wall.end.x - wall.start.x;
-            const dy = wall.end.y - wall.start.y;
-            const len = Math.sqrt(dx * dx + dy * dy);
-
-            // 투영된 지점의 비율(t)이 오프닝 구간 내에 있는지 확인
-            const isPassingThroughDoor = wallOpenings.some(op => {
-              if (op.type !== 'door' && op.type !== 'balcony') return false; // 창문은 통과 불가
-
-              const opWidth = op.type === 'door' ? DOOR_WIDTH : BALCONY_WIDTH;
-              const opPos = op.t * len;
-              const start = opPos - opWidth / 2;
-              const end = opPos + opWidth / 2;
-
-              const projPos = proj.t * len;
-
-              // 플레이어의 반지름을 고려하여 오프닝 범위 내인지 확인 (조금 여유 있게)
-              return projPos >= (start + 10) && projPos <= (end - 10);
-            });
-
-            if (isPassingThroughDoor) return false; // 문이면 통과 가능
-
-            return true; // 문이 아니면 충돌
-          }
-        }
-        return false;
+      // 충돌 감지 함수 (Imported Wrapper)
+      const checkPlayerCollision = (x, z) => {
+        return checkCollision(x, z, walls, openings);
       };
 
       useEffect(() => {
@@ -366,14 +137,14 @@
         rendererRef.current = renderer;
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
         scene.add(ambientLight);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
         hemiLight.position.set(0, 200, 0);
         scene.add(hemiLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
         dirLight.position.set(500, 1500, 1000);
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048;
@@ -407,599 +178,29 @@
 
         // Build Scene Objects
         rooms.forEach(room => {
-          if (room.points.length < 3) return;
-          const shape = new THREE.Shape();
-          shape.moveTo(room.points[0].x + offsetX, room.points[0].y + offsetZ);
-          for (let i = 1; i < room.points.length; i++) {
-            shape.lineTo(room.points[i].x + offsetX, room.points[i].y + offsetZ);
+          const result = createRoomObjects(room, floorMaterial, ceilingMaterial, offsetX, offsetZ);
+          if (result) {
+            scene.add(result.floorMesh);
+            scene.add(result.ceilingMesh);
+            ceilingsRef.current.push(result.ceilingMesh);
           }
-          shape.lineTo(room.points[0].x + offsetX, room.points[0].y + offsetZ);
-          const geometry = new THREE.ShapeGeometry(shape);
-
-          // 방 바닥에 텍스처 적용 (캐싱된 재질 사용)
-          const material = floorMaterial;
-
-          // UV 매핑 조정 (텍스처 스케일)
-          const posAttribute = geometry.attributes.position;
-          const uvAttribute = geometry.attributes.uv;
-          for (let i = 0; i < posAttribute.count; i++) {
-            const x = posAttribute.getX(i);
-            const y = posAttribute.getY(i);
-            uvAttribute.setXY(i, x / 500, y / 500); // 500 단위로 반복
-          }
-
-          const mesh = new THREE.Mesh(geometry, material);
-          mesh.rotation.x = Math.PI / 2;
-          mesh.position.y = 0.5;
-          mesh.receiveShadow = true;
-          scene.add(mesh);
-
-
-          // 천장 생성 (Smart Ceiling)
-          const ceilingGeom = new THREE.ShapeGeometry(shape);
-          // UV 매핑
-          const cPosAttribute = ceilingGeom.attributes.position;
-          const cUvAttribute = ceilingGeom.attributes.uv;
-          for (let i = 0; i < cPosAttribute.count; i++) {
-            const x = cPosAttribute.getX(i);
-            const y = cPosAttribute.getY(i);
-            cUvAttribute.setXY(i, x / 500, y / 500);
-          }
-
-          const ceilingMesh = new THREE.Mesh(ceilingGeom, ceilingMaterial);
-          ceilingMesh.rotation.x = Math.PI / 2; // 바닥과 같은 방향 (뒤집힘 주의)
-          ceilingMesh.position.y = WALL_HEIGHT; // 벽 높이에 배치
-          ceilingMesh.visible = false; // 기본적으로 숨김 (FPV에서만 표시)
-          scene.add(ceilingMesh);
-          ceilingsRef.current.push(ceilingMesh);
         });
 
         walls.forEach((wall, index) => {
-          const wallOpenings = openings.filter(o => o.wallIndex === index);
-          const dx = wall.end.x - wall.start.x;
-          const dy = wall.end.y - wall.start.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          const angle = Math.atan2(dy, dx);
-
-          const wallMat = wallMaterial;
-
-          if (wallOpenings.length === 0) {
-            const geometry = new THREE.BoxGeometry(len, WALL_HEIGHT, WALL_THICKNESS);
-            const mesh = new THREE.Mesh(geometry, wallMat);
-            const cx = (wall.start.x + wall.end.x) / 2;
-            const cz = (wall.start.y + wall.end.y) / 2;
-            mesh.position.set(cx + offsetX, WALL_HEIGHT / 2, cz + offsetZ);
-            mesh.rotation.y = -angle;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            scene.add(mesh);
-          } else {
-            wallOpenings.sort((a, b) => a.t - b.t);
-            let currentPos = 0;
-            const wallGroup = new THREE.Group();
-            wallGroup.position.set(wall.start.x + offsetX, 0, wall.start.y + offsetZ);
-            wallGroup.rotation.y = -angle;
-
-            wallOpenings.forEach(op => {
-              const opPos = op.t * len;
-              const opWidth = op.type === 'door' ? DOOR_WIDTH : (op.type === 'balcony' ? BALCONY_WIDTH : WINDOW_WIDTH);
-              const opHeight = op.type === 'door' ? DOOR_HEIGHT : (op.type === 'balcony' ? BALCONY_HEIGHT : WINDOW_HEIGHT);
-              const opY = (op.type === 'door' || op.type === 'balcony') ? 0 : WINDOW_SILL;
-              const start = opPos - opWidth / 2;
-              const end = opPos + opWidth / 2;
-
-              if (start > currentPos) {
-                const segLen = start - currentPos;
-                const geom = new THREE.BoxGeometry(segLen, WALL_HEIGHT, WALL_THICKNESS);
-                const mesh = new THREE.Mesh(geom, wallMat);
-                mesh.position.set(currentPos + segLen / 2, WALL_HEIGHT / 2, 0);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                wallGroup.add(mesh);
-              }
-
-              const headerHeight = WALL_HEIGHT - (opY + opHeight);
-              if (headerHeight > 0) {
-                const geom = new THREE.BoxGeometry(opWidth, headerHeight, WALL_THICKNESS);
-                const mesh = new THREE.Mesh(geom, wallMat);
-                mesh.position.set(opPos, WALL_HEIGHT - headerHeight / 2, 0);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                wallGroup.add(mesh);
-              }
-
-              if (opY > 0) {
-                const geom = new THREE.BoxGeometry(opWidth, opY, WALL_THICKNESS);
-                const mesh = new THREE.Mesh(geom, wallMat);
-                mesh.position.set(opPos, opY / 2, 0);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                wallGroup.add(mesh);
-              }
-
-              if (op.type === 'door') {
-                // 경첩(Pivot) 역할을 할 그룹 생성
-                const doorPivot = new THREE.Group();
-                doorPivot.position.set(start, 0, 0); // 오프닝의 시작점(왼쪽)을 경첩 위치로
-
-                const doorGeom = new THREE.BoxGeometry(opWidth, opHeight, 5);
-                const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 });
-                const door = new THREE.Mesh(doorGeom, doorMat);
-
-                // 피벗 기준 문 위치 조정 (문의 왼쪽 끝이 피벗에 오도록 중심 이동)
-                door.position.set(opWidth / 2, opHeight / 2, 0);
-                door.castShadow = true;
-
-                // 손잡이 추가
-                const handleGeom = new THREE.SphereGeometry(3);
-                const handleMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
-                const handle = new THREE.Mesh(handleGeom, handleMat);
-                // 손잡이 위치 수정: 높이는 중앙(0), 가로는 끝쪽(opWidth/2 - 10)
-                handle.position.set(opWidth / 2 - 10, 0, 5);
-                door.add(handle);
-                const handle2 = handle.clone();
-                handle2.position.z = -5;
-                door.add(handle2);
-
-                doorPivot.add(door);
-                wallGroup.add(doorPivot);
-
-                // 애니메이션을 위해 참조 저장
-                doorsRef.current.push({
-                  pivot: doorPivot,
-                  width: opWidth
-                });
-              } else if (op.type === 'balcony') {
-                // 발코니 창 (유리)
-                const winGeom = new THREE.BoxGeometry(opWidth, opHeight, 2);
-                const winMat = new THREE.MeshPhysicalMaterial({
-                  color: 0xa7d3ef, // 조금 더 진한 하늘색
-                  transparent: true,
-                  opacity: 0.6, // 투명도 감소 (더 잘 보이게)
-                  metalness: 0.1,
-                  roughness: 0.1,
-                  transmission: 0.2 // 투과율 감소
-                });
-                const win = new THREE.Mesh(winGeom, winMat);
-                win.position.set(opPos, opHeight / 2, 0);
-
-                // 프레임 추가 (테두리)
-                const frameGeom = new THREE.BoxGeometry(opWidth + 4, opHeight + 4, 4);
-                const frameMat = new THREE.MeshStandardMaterial({ color: 0x333333 }); // 짙은 회색 프레임
-                // 프레임은 속이 비어있어야 하므로 4개의 막대로 구성하거나, 간단히 뒤에 덧대기보다는...
-                // 여기서는 간단히 유리만 더 잘 보이게 처리하고, 프레임은 생략하거나 간단한 띠로 표현
-
-                // 간단한 프레임 (상하좌우)
-                const frameThick = 4;
-                const frameDepth = 6;
-                const frameGroup = new THREE.Group();
-                frameGroup.position.set(opPos, opHeight / 2, 0);
-
-                // 상
-                const topFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
-                topFrame.position.y = opHeight / 2 - frameThick / 2;
-                frameGroup.add(topFrame);
-                // 하
-                const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
-                bottomFrame.position.y = -opHeight / 2 + frameThick / 2;
-                frameGroup.add(bottomFrame);
-                // 좌
-                const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
-                leftFrame.position.x = -opWidth / 2 + frameThick / 2;
-                frameGroup.add(leftFrame);
-                // 우
-                const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
-                rightFrame.position.x = opWidth / 2 - frameThick / 2;
-                frameGroup.add(rightFrame);
-
-                wallGroup.add(frameGroup);
-                wallGroup.add(win);
-
-              } else {
-                const winGeom = new THREE.BoxGeometry(opWidth, opHeight, 2);
-                const winMat = new THREE.MeshPhysicalMaterial({
-                  color: 0xa7d3ef,
-                  transparent: true,
-                  opacity: 0.6,
-                  metalness: 0.1,
-                  roughness: 0.1,
-                  transmission: 0.2
-                });
-                const win = new THREE.Mesh(winGeom, winMat);
-                win.position.set(opPos, opY + opHeight / 2, 0);
-
-                // 창문 프레임
-                const frameThick = 4;
-                const frameDepth = 6;
-                const frameMat = new THREE.MeshStandardMaterial({ color: 0xffffff }); // 흰색 프레임
-                const frameGroup = new THREE.Group();
-                frameGroup.position.set(opPos, opY + opHeight / 2, 0);
-
-                // 상
-                const topFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
-                topFrame.position.y = opHeight / 2 - frameThick / 2;
-                frameGroup.add(topFrame);
-                // 하
-                const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(opWidth, frameThick, frameDepth), frameMat);
-                bottomFrame.position.y = -opHeight / 2 + frameThick / 2;
-                frameGroup.add(bottomFrame);
-                // 좌
-                const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
-                leftFrame.position.x = -opWidth / 2 + frameThick / 2;
-                frameGroup.add(leftFrame);
-                // 우
-                const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThick, opHeight, frameDepth), frameMat);
-                rightFrame.position.x = opWidth / 2 - frameThick / 2;
-                frameGroup.add(rightFrame);
-
-                wallGroup.add(frameGroup);
-                wallGroup.add(win);
-              }
-              currentPos = end;
-            });
-
-            if (currentPos < len) {
-              const segLen = len - currentPos;
-              const geom = new THREE.BoxGeometry(segLen, WALL_HEIGHT, WALL_THICKNESS);
-              const mesh = new THREE.Mesh(geom, wallMat);
-              mesh.position.set(currentPos + segLen / 2, WALL_HEIGHT / 2, 0);
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
-              wallGroup.add(mesh);
-            }
-            scene.add(wallGroup);
+          const result = createWallObjects(wall, index, openings, wallMaterial, offsetX, offsetZ);
+          if (result.mesh) {
+            scene.add(result.mesh);
+          }
+          if (result.doors.length > 0) {
+            doorsRef.current.push(...result.doors);
           }
         });
 
         furniture.forEach(item => {
-          const template = FURNITURE_TEMPLATES[item.type];
-          if (!template) return;
-          const group = new THREE.Group();
-          group.position.set(item.x + offsetX, 0, item.y + offsetZ);
-          group.rotation.y = -item.rotation;
-          const { width, depth, height, color } = template;
-
-          // 가구 재질 (Standard Material)
-          const furnitureMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
-
-          if (item.type.includes('bed')) {
-            const frameGeom = new THREE.BoxGeometry(width, 30, depth);
-            const frameMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 });
-            const frame = new THREE.Mesh(frameGeom, frameMat);
-            frame.position.y = 15;
-            frame.castShadow = true;
-            group.add(frame);
-
-            const matGeom = new THREE.BoxGeometry(width - 10, 20, depth - 10);
-            const matMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
-            const mat = new THREE.Mesh(matGeom, matMat);
-            mat.position.y = 30 + 10;
-            mat.castShadow = true;
-            group.add(mat);
-
-            const pillowGeom = new THREE.BoxGeometry(width - 20, 10, 30);
-            const pillowMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 1 });
-            const pillow = new THREE.Mesh(pillowGeom, pillowMat);
-            pillow.position.set(0, 55, -depth / 2 + 25);
-            pillow.castShadow = true;
-            group.add(pillow);
-
-            const headGeom = new THREE.BoxGeometry(width, 100, 10);
-            const headMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.6 });
-            const head = new THREE.Mesh(headGeom, headMat);
-            head.position.set(0, 50, -depth / 2 + 5);
-            head.castShadow = true;
-            group.add(head);
-          } else if (item.type.includes('sofa')) {
-            const seatHeight = 40;
-            const seatGeom = new THREE.BoxGeometry(width, seatHeight, depth - 20);
-            const seatMat = new THREE.MeshStandardMaterial({ color, roughness: 1 }); // 패브릭 느낌
-            const seat = new THREE.Mesh(seatGeom, seatMat);
-            seat.position.set(0, seatHeight / 2, 10);
-            seat.castShadow = true;
-            group.add(seat);
-
-            const backGeom = new THREE.BoxGeometry(width, height, 20);
-            const back = new THREE.Mesh(backGeom, seatMat);
-            back.position.set(0, height / 2, -depth / 2 + 10);
-            back.castShadow = true;
-            group.add(back);
-
-            const armGeom = new THREE.BoxGeometry(15, 60, depth);
-            const armLeft = new THREE.Mesh(armGeom, seatMat);
-            armLeft.position.set(-width / 2 + 7.5, 30, 0);
-            group.add(armLeft);
-
-            const armRight = new THREE.Mesh(armGeom, seatMat);
-            armRight.position.set(width / 2 - 7.5, 30, 0);
-            group.add(armRight);
-          } else if (item.type === 'desk') {
-            const topGeom = new THREE.BoxGeometry(width, 5, depth);
-            const topMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1 });
-            const top = new THREE.Mesh(topGeom, topMat);
-            top.position.y = height - 2.5;
-            top.castShadow = true;
-            group.add(top);
-
-            const legGeom = new THREE.BoxGeometry(5, height - 5, 5);
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.2, metalness: 0.8 });
-            [{ x: -width / 2 + 10, z: -depth / 2 + 10 }, { x: width / 2 - 10, z: -depth / 2 + 10 },
-            { x: -width / 2 + 10, z: depth / 2 - 10 }, { x: width / 2 - 10, z: depth / 2 - 10 }]
-              .forEach(pos => {
-                const leg = new THREE.Mesh(legGeom, legMat);
-                leg.position.set(pos.x, (height - 5) / 2, pos.z);
-                leg.castShadow = true;
-                group.add(leg);
-              });
-
-            // 의자 추가
-            const chairGroup = new THREE.Group();
-            const chairWidth = 45;
-            const chairDepth = 45;
-            const chairHeight = 45;
-
-            // 책상 앞쪽에 배치
-            chairGroup.position.set(0, 0, depth / 2 + 20);
-            chairGroup.rotation.y = Math.PI; // 책상을 바라보게
-
-            // 좌판
-            const seat = new THREE.Mesh(
-              new THREE.BoxGeometry(chairWidth, 5, chairDepth),
-              new THREE.MeshStandardMaterial({ color: 0x4b5563 }) // 다크 그레이
-            );
-            seat.position.y = chairHeight - 2.5;
-            seat.castShadow = true;
-            chairGroup.add(seat);
-
-            // 다리 (오피스 체어 스타일)
-            const poleGeom = new THREE.BoxGeometry(5, chairHeight - 10, 5);
-            const pole = new THREE.Mesh(poleGeom, new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
-            pole.position.y = (chairHeight - 10) / 2;
-            chairGroup.add(pole);
-
-            const baseGeom = new THREE.BoxGeometry(35, 5, 35);
-            const base = new THREE.Mesh(baseGeom, new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
-            base.position.y = 2.5;
-            chairGroup.add(base);
-
-            // 등받이
-            const back = new THREE.Mesh(
-              new THREE.BoxGeometry(chairWidth, 45, 5),
-              new THREE.MeshStandardMaterial({ color: 0x4b5563 })
-            );
-            back.position.set(0, chairHeight + 22.5, -chairDepth / 2 + 2.5);
-            back.castShadow = true;
-            chairGroup.add(back);
-
-            // 팔걸이
-            const armGeom = new THREE.BoxGeometry(5, 20, 30);
-            const armMat = new THREE.MeshStandardMaterial({ color: 0x1f2937 });
-
-            const leftArm = new THREE.Mesh(armGeom, armMat);
-            leftArm.position.set(-chairWidth / 2 + 2.5, chairHeight + 10, 0);
-            chairGroup.add(leftArm);
-
-            const rightArm = new THREE.Mesh(armGeom, armMat);
-            rightArm.position.set(chairWidth / 2 - 2.5, chairHeight + 10, 0);
-            chairGroup.add(rightArm);
-
-            group.add(chairGroup);
-          } else if (item.type.includes('bookshelf')) {
-            const thickness = 2;
-            const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
-
-            // Back
-            const backGeom = new THREE.BoxGeometry(width, height, thickness);
-            const back = new THREE.Mesh(backGeom, mat);
-            back.position.set(0, height / 2, -depth / 2 + thickness / 2);
-            back.castShadow = true;
-            group.add(back);
-
-            // Sides
-            const sideGeom = new THREE.BoxGeometry(thickness, height, depth);
-            const left = new THREE.Mesh(sideGeom, mat);
-            left.position.set(-width / 2 + thickness / 2, height / 2, 0);
-            left.castShadow = true;
-            group.add(left);
-
-            const right = new THREE.Mesh(sideGeom, mat);
-            right.position.set(width / 2 - thickness / 2, height / 2, 0);
-            right.castShadow = true;
-            group.add(right);
-
-            // Shelves
-            const shelfCount = 6;
-            const shelfGeom = new THREE.BoxGeometry(width - thickness * 2, thickness, depth - thickness);
-            for (let i = 0; i < shelfCount; i++) {
-              const shelf = new THREE.Mesh(shelfGeom, mat);
-              const posY = (height - thickness) * (i / (shelfCount - 1)) + thickness / 2;
-              shelf.position.set(0, posY, thickness / 2);
-              shelf.castShadow = true;
-              group.add(shelf);
-            }
-          } else if (item.type.includes('fridge')) {
-            // Body
-            const bodyGeom = new THREE.BoxGeometry(width, height, depth - 5);
-            const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.2, metalness: 0.1 });
-            const body = new THREE.Mesh(bodyGeom, bodyMat);
-            body.position.set(0, height / 2, -2.5);
-            body.castShadow = true;
-            group.add(body);
-
-            // Doors
-            const doorDepth = 5;
-            const doorGap = 0.5;
-
-            if (item.type === 'fridge_double') {
-              const doorWidth = (width - doorGap) / 2;
-              const doorGeom = new THREE.BoxGeometry(doorWidth, height, doorDepth);
-
-              const leftDoor = new THREE.Mesh(doorGeom, bodyMat);
-              leftDoor.position.set(-width / 4 - doorGap / 4, height / 2, depth / 2 - doorDepth / 2);
-              leftDoor.castShadow = true;
-              group.add(leftDoor);
-
-              const rightDoor = new THREE.Mesh(doorGeom, bodyMat);
-              rightDoor.position.set(width / 4 + doorGap / 4, height / 2, depth / 2 - doorDepth / 2);
-              rightDoor.castShadow = true;
-              group.add(rightDoor);
-
-              // Handles
-              const handleGeom = new THREE.BoxGeometry(2, 40, 2);
-              const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.1, metalness: 0.8 });
-
-              const leftHandle = new THREE.Mesh(handleGeom, handleMat);
-              leftHandle.position.set(-5, height / 2, depth / 2 + 1);
-              group.add(leftHandle);
-
-              const rightHandle = new THREE.Mesh(handleGeom, handleMat);
-              rightHandle.position.set(5, height / 2, depth / 2 + 1);
-              group.add(rightHandle);
-            } else {
-              const doorGeom = new THREE.BoxGeometry(width, height, doorDepth);
-              const door = new THREE.Mesh(doorGeom, bodyMat);
-              door.position.set(0, height / 2, depth / 2 - doorDepth / 2);
-              door.castShadow = true;
-              group.add(door);
-
-              const handle = new THREE.Mesh(handleGeom, handleMat);
-              handle.position.set(-width / 2 + 10, height / 2, depth / 2 + 1);
-              group.add(handle);
-            }
-          } else if (item.type.includes('dining_table')) {
-            // 상판
-            const topGeom = new THREE.BoxGeometry(width, 4, depth);
-            const topMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
-            const top = new THREE.Mesh(topGeom, topMat);
-            top.position.y = height - 2;
-            top.castShadow = true;
-            group.add(top);
-
-            // 다리 (4개)
-            const legGeom = new THREE.BoxGeometry(6, height - 4, 6);
-            const legMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
-            const legPos = [
-              { x: -width / 2 + 10, z: -depth / 2 + 10 },
-              { x: width / 2 - 10, z: -depth / 2 + 10 },
-              { x: -width / 2 + 10, z: depth / 2 - 10 },
-              { x: width / 2 - 10, z: depth / 2 - 10 }
-            ];
-            legPos.forEach(pos => {
-              const leg = new THREE.Mesh(legGeom, legMat);
-              leg.position.set(pos.x, (height - 4) / 2, pos.z);
-              leg.castShadow = true;
-              group.add(leg);
-            });
-
-            // 의자 (간단하게 큐브로 표현하거나 등받이 있는 형태)
-            const chairWidth = 40;
-            const chairDepth = 40;
-            const chairHeight = 45;
-
-            const chairCountSide = item.type === 'dining_table_6p' ? 3 : 2;
-            const spacing = width / chairCountSide;
-
-            for (let side = -1; side <= 1; side += 2) { // 양쪽 (-1, 1)
-              for (let i = 0; i < chairCountSide; i++) {
-                const chairGroup = new THREE.Group();
-                // 위치 계산: 중앙 정렬
-                const x = -width / 2 + spacing / 2 + i * spacing;
-                const z = side * (depth / 2 + 20); // 테이블에서 약간 떨어짐
-
-                chairGroup.position.set(x, 0, z);
-                // 회전: 테이블을 바라보게
-                chairGroup.rotation.y = side === 1 ? Math.PI : 0;
-
-                // 좌판
-                const seat = new THREE.Mesh(
-                  new THREE.BoxGeometry(chairWidth, 5, chairDepth),
-                  new THREE.MeshStandardMaterial({ color: 0xa1887f })
-                );
-                seat.position.y = chairHeight - 2.5;
-                seat.castShadow = true;
-                chairGroup.add(seat);
-
-                // 다리
-                const cLegGeom = new THREE.BoxGeometry(4, chairHeight - 5, 4);
-                const cLegs = [
-                  { x: -15, z: -15 }, { x: 15, z: -15 },
-                  { x: -15, z: 15 }, { x: 15, z: 15 }
-                ];
-                cLegs.forEach(p => {
-                  const l = new THREE.Mesh(cLegGeom, new THREE.MeshStandardMaterial({ color: 0x8d6e63 }));
-                  l.position.set(p.x, (chairHeight - 5) / 2, p.z);
-                  chairGroup.add(l);
-                });
-
-                // 등받이
-                const back = new THREE.Mesh(
-                  new THREE.BoxGeometry(chairWidth, 40, 5),
-                  new THREE.MeshStandardMaterial({ color: 0xa1887f })
-                );
-                back.position.set(0, chairHeight + 20, -chairDepth / 2 + 2.5);
-                back.castShadow = true;
-                chairGroup.add(back);
-
-                group.add(chairGroup);
-              }
-            }
-
-          } else if (item.type === 'tv_stand') {
-            // 본체
-            const bodyGeom = new THREE.BoxGeometry(width, height - 10, depth);
-            const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
-            const body = new THREE.Mesh(bodyGeom, bodyMat);
-            body.position.y = (height - 10) / 2 + 10;
-            body.castShadow = true;
-            group.add(body);
-
-            // 다리
-            const legGeom = new THREE.BoxGeometry(5, 10, 5);
-            const legPos = [
-              { x: -width / 2 + 10, z: -depth / 2 + 10 },
-              { x: width / 2 - 10, z: -depth / 2 + 10 },
-              { x: -width / 2 + 10, z: depth / 2 - 10 },
-              { x: width / 2 - 10, z: depth / 2 - 10 }
-            ];
-            legPos.forEach(pos => {
-              const leg = new THREE.Mesh(legGeom, bodyMat);
-              leg.position.set(pos.x, 5, pos.z);
-              leg.castShadow = true;
-              group.add(leg);
-            });
-
-            // 서랍/문 디테일
-            const drawerGeom = new THREE.BoxGeometry(width / 3 - 4, height - 20, 2);
-            const drawerMat = new THREE.MeshStandardMaterial({ color: 0x795548 });
-            for (let i = -1; i <= 1; i++) {
-              const drawer = new THREE.Mesh(drawerGeom, drawerMat);
-              drawer.position.set(i * (width / 3), (height - 10) / 2 + 10, depth / 2 + 1);
-              group.add(drawer);
-            }
-
-            // TV
-            const tvWidth = 140;
-            const tvHeight = 80;
-            const tvDepth = 5;
-            const tvGeom = new THREE.BoxGeometry(tvWidth, tvHeight, tvDepth);
-            const tvMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
-            const tv = new THREE.Mesh(tvGeom, tvMat);
-            tv.position.set(0, height + tvHeight / 2, 0);
-            tv.castShadow = true;
-            group.add(tv);
-
-            // TV 받침대
-            const standGeom = new THREE.BoxGeometry(40, 5, 20);
-            const stand = new THREE.Mesh(standGeom, tvMat);
-            stand.position.set(0, height + 2.5, 0);
-            group.add(stand);
-
-            const neckGeom = new THREE.BoxGeometry(10, 10, 5);
-            const neck = new THREE.Mesh(neckGeom, tvMat);
-            neck.position.set(0, height + 7.5, 0);
-            group.add(neck);
+          const group = createFurnitureGroup(item, offsetX, offsetZ);
+          if (group) {
+            scene.add(group);
           }
-          scene.add(group);
         });
 
         // Controls Setup
@@ -1047,7 +248,7 @@
 
             fpvControls.moveRight(-velocity.x * delta);
 
-            if (checkCollision(camera.position.x, camera.position.z)) {
+            if (checkPlayerCollision(camera.position.x, camera.position.z)) {
               camera.position.x = oldX;
               camera.position.z = oldZ;
               velocity.x = 0;
@@ -1059,7 +260,7 @@
 
             fpvControls.moveForward(-velocity.z * delta);
 
-            if (checkCollision(camera.position.x, camera.position.z)) {
+            if (checkPlayerCollision(camera.position.x, camera.position.z)) {
               camera.position.x = currX;
               camera.position.z = currZ;
               velocity.z = 0;
@@ -1491,43 +692,27 @@
       // 3. 파일 다운로드 핸들러
       const handleFileDownload = () => {
         const data = { walls, rooms, openings, furniture, timestamp: Date.now() };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `floor-plan-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadFloorPlan(data);
       };
 
       // 4. 파일 업로드 핸들러
       const handleFileUpload = (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const parsed = JSON.parse(event.target.result);
-            if (parsed.walls && parsed.rooms) {
-              reset({
-                walls: parsed.walls || [],
-                rooms: parsed.rooms || [],
-                openings: parsed.openings || [],
-                furniture: parsed.furniture || []
-              });
-              alert("파일을 성공적으로 불러왔습니다.");
-            } else {
-              alert("올바르지 않은 파일 형식입니다.");
-            }
-          } catch (err) {
-            console.error(err);
-            alert("파일을 읽는 중 오류가 발생했습니다.");
+        uploadFloorPlan(
+          file,
+          (parsed) => {
+            reset({
+              walls: parsed.walls || [],
+              rooms: parsed.rooms || [],
+              openings: parsed.openings || [],
+              furniture: parsed.furniture || []
+            });
+            alert("파일을 성공적으로 불러왔습니다.");
+          },
+          (errorMessage) => {
+            alert(errorMessage);
           }
-        };
-        reader.readAsText(file);
+        );
         // 같은 파일을 다시 선택할 수 있도록 value 초기화
         e.target.value = '';
       };
@@ -1540,57 +725,9 @@
         return { x, y };
       };
 
-      // 스마트 스냅 함수
-      const getSnappedPosition = (x, y) => {
-        let sx = snapToGrid(x);
-        let sy = snapToGrid(y);
-        const SNAP_DIST = 15 / scale; // 스냅 감지 거리 (화면 픽셀 기준 15px)
-
-        const newGuides = [];
-        let snappedX = false;
-        let snappedY = false;
-
-        // 참조할 포인트 수집 (벽의 양 끝점)
-        const points = [];
-        walls.forEach(w => {
-          points.push(w.start);
-          points.push(w.end);
-        });
-        rooms.forEach(r => {
-          r.points.forEach(p => points.push(p));
-        });
-
-        // 1. Vertex Snapping (점 스냅) - 가장 강력한 스냅
-        // 기존 점에 가까우면 그 점으로 강제 이동 (줌 아웃 상태에서도 쉽게 연결 가능)
-        for (const p of points) {
-          const dist = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
-          if (dist < SNAP_DIST) {
-            return { x: p.x, y: p.y, guides: [] }; // 가이드 없이 바로 스냅
-          }
-        }
-
-        // 2. Alignment Snapping (정렬 스냅)
-        // X축 스냅 (수직선 가이드) - 다른 점의 X좌표와 일치
-        for (const p of points) {
-          if (Math.abs(p.x - x) < SNAP_DIST) {
-            sx = p.x;
-            snappedX = true;
-            newGuides.push({ type: 'x', pos: sx, start: Math.min(y, p.y), end: Math.max(y, p.y) });
-            break; // 하나만 스냅
-          }
-        }
-
-        // Y축 스냅 (수평선 가이드) - 다른 점의 Y좌표와 일치
-        for (const p of points) {
-          if (Math.abs(p.y - y) < SNAP_DIST) {
-            sy = p.y;
-            snappedY = true;
-            newGuides.push({ type: 'y', pos: sy, start: Math.min(x, p.x), end: Math.max(x, p.x) });
-            break;
-          }
-        }
-
-        return { x: sx, y: sy, guides: newGuides };
+      // 스마트 스냅 함수 (Imported Wrapper)
+      const getSnappedPositionWrapper = (x, y) => {
+        return getSnappedPosition(x, y, walls, rooms, scale);
       };
 
       // 캔버스 렌더링
@@ -1614,29 +751,12 @@
         ctx.scale(scale, scale);
 
         // 그리드 그리기
-        const startX = Math.floor(-pan.x / scale / VISUAL_GRID_SIZE) * VISUAL_GRID_SIZE;
-        const startY = Math.floor(-pan.y / scale / VISUAL_GRID_SIZE) * VISUAL_GRID_SIZE;
-        const endX = startX + (canvas.width / scale) + VISUAL_GRID_SIZE;
-        const endY = startY + (canvas.height / scale) + VISUAL_GRID_SIZE;
-
-        ctx.beginPath();
-        ctx.strokeStyle = "#e5e7eb";
-        ctx.lineWidth = 1 / scale;
-
-        for (let x = startX; x <= endX; x += VISUAL_GRID_SIZE) {
-          ctx.moveTo(x, startY);
-          ctx.lineTo(x, endY);
-        }
-        for (let y = startY; y <= endY; y += VISUAL_GRID_SIZE) {
-          ctx.moveTo(startX, y);
-          ctx.lineTo(endX, y);
-        }
-        ctx.stroke();
+        drawGrid(ctx, canvas, scale, pan);
 
         // 1. 방 그리기
-        rooms.forEach(room => drawRoom(ctx, room.points));
+        rooms.forEach(room => drawRoom(ctx, room.points, false, scale));
         if (currentRoom.length > 0) {
-          drawRoom(ctx, currentRoom, true);
+          drawRoom(ctx, currentRoom, true, scale);
           ctx.beginPath();
           ctx.strokeStyle = "blue";
           ctx.setLineDash([5 / scale, 5 / scale]);
@@ -1647,20 +767,20 @@
         }
 
         // 2. 벽 그리기
-        walls.forEach(wall => drawWall(ctx, wall, 'black'));
-        if (currentWall) drawWall(ctx, currentWall, 'red', true);
+        walls.forEach(wall => drawWall(ctx, wall, 'black', scale));
+        if (currentWall) drawWall(ctx, currentWall, 'red', scale, true);
 
         // 3. 오프닝 그리기
-        openings.forEach(op => drawOpening(ctx, op, walls));
-        if (previewOpening) drawOpening(ctx, previewOpening, walls, true);
+        openings.forEach(op => drawOpening(ctx, op, walls, scale));
+        if (previewOpening) drawOpening(ctx, previewOpening, walls, scale, true);
 
         // 4. 가구 그리기
         furniture.forEach(item => {
           // 드래그 중인 가구는 그리지 않음 (previewFurniture로 그려짐)
           if (isDraggingFurniture && item.id === selectedFurnitureId) return;
-          drawFurniture(ctx, item);
+          drawFurniture(ctx, item, scale, selectedFurnitureId);
         });
-        if (previewFurniture) drawFurniture(ctx, previewFurniture, true);
+        if (previewFurniture) drawFurniture(ctx, previewFurniture, scale, selectedFurnitureId, true);
 
         // 5. 스마트 가이드 그리기
         if (guides.length > 0) {
@@ -1685,193 +805,7 @@
 
       }, [walls, rooms, openings, furniture, currentWall, currentRoom, previewOpening, previewFurniture, mode, scale, pan, guides]);
 
-      const drawRoom = (ctx, points, isPreview = false) => {
-        if (points.length < 2) return;
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i].x, points[i].y);
-        }
-        if (!isPreview) ctx.closePath();
 
-        ctx.fillStyle = isPreview ? "rgba(59, 130, 246, 0.2)" : "rgba(224, 231, 255, 0.5)";
-        ctx.fill();
-        ctx.strokeStyle = isPreview ? "blue" : "#a5b4fc";
-        ctx.lineWidth = 2 / scale;
-        ctx.stroke();
-
-        points.forEach(p => {
-          ctx.beginPath();
-          ctx.fillStyle = "blue";
-          ctx.arc(p.x, p.y, 3 / scale, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        // 방 치수선 표시 (각 변의 길이)
-        if (points.length > 1) {
-          ctx.fillStyle = "#6b7280";
-          ctx.font = `${10 / scale}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-
-          for (let i = 0; i < (isPreview ? points.length - 1 : points.length); i++) {
-            const p1 = points[i];
-            const p2 = points[(i + 1) % points.length];
-            const dist = distance(p1, p2);
-            if (dist > 20) {
-              const midX = (p1.x + p2.x) / 2;
-              const midY = (p1.y + p2.y) / 2;
-              ctx.fillText(`${Math.round(dist)}`, midX, midY);
-            }
-          }
-        }
-      };
-
-      const drawWall = (ctx, wall, color, isGuide = false) => {
-        ctx.beginPath();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = (isGuide ? 2 : 4) / scale;
-        ctx.lineCap = "round";
-        ctx.moveTo(wall.start.x, wall.start.y);
-        ctx.lineTo(wall.end.x, wall.end.y);
-        ctx.stroke();
-
-        ctx.fillStyle = "#3b82f6";
-        ctx.beginPath();
-        ctx.arc(wall.start.x, wall.start.y, 4 / scale, 0, Math.PI * 2);
-        ctx.arc(wall.end.x, wall.end.y, 4 / scale, 0, Math.PI * 2);
-        ctx.fill();
-
-        const dx = wall.end.x - wall.start.x;
-        const dy = wall.end.y - wall.start.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-
-        if (len > 5) {
-          const midX = (wall.start.x + wall.end.x) / 2;
-          const midY = (wall.start.y + wall.end.y) / 2;
-
-          ctx.save();
-          ctx.translate(midX, midY);
-
-          let angle = Math.atan2(dy, dx);
-          if (angle > Math.PI / 2) angle -= Math.PI;
-          else if (angle < -Math.PI / 2) angle += Math.PI;
-
-          ctx.rotate(angle);
-
-          const fontSize = Math.max(12 / scale, 8);
-          ctx.font = `bold ${fontSize}px sans-serif`;
-          ctx.fillStyle = "#4b5563";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-
-          ctx.strokeStyle = "white";
-          ctx.lineWidth = 3 / scale;
-          const text = Math.round(len) + " cm";
-          ctx.strokeText(text, 0, -4 / scale);
-          ctx.fillText(text, 0, -4 / scale);
-
-          ctx.restore();
-        }
-      };
-
-      const drawOpening = (ctx, op, walls, isPreview = false) => {
-        const wall = walls[op.wallIndex];
-        if (!wall) return;
-
-        const dx = wall.end.x - wall.start.x;
-        const dy = wall.end.y - wall.start.y;
-
-        const cx = wall.start.x + dx * op.t;
-        const cy = wall.start.y + dy * op.t;
-
-        const angle = Math.atan2(dy, dx);
-        const width = op.type === 'door' ? DOOR_WIDTH : (op.type === 'balcony' ? BALCONY_WIDTH : WINDOW_WIDTH);
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-
-        ctx.fillStyle = "white";
-        ctx.fillRect(-width / 2, -4 / scale, width, 8 / scale);
-
-        ctx.strokeStyle = isPreview ? "red" : "brown";
-        ctx.lineWidth = 2 / scale;
-
-        if (op.type === 'door') {
-          ctx.beginPath();
-          ctx.arc(-width / 2, -width / 2, width, 0, Math.PI / 2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(-width / 2, 0);
-          ctx.lineTo(-width / 2, -width);
-          ctx.stroke();
-        } else {
-          ctx.strokeRect(-width / 2, -2 / scale, width, 4 / scale);
-          ctx.fillStyle = "#bae6fd";
-          ctx.fillRect(-width / 2, -2 / scale, width, 4 / scale);
-
-          // 발코니는 중간에 선 추가 (슬라이딩 도어 느낌)
-          if (op.type === 'balcony') {
-            ctx.beginPath();
-            ctx.moveTo(0, -2 / scale);
-            ctx.lineTo(0, 2 / scale);
-            ctx.stroke();
-          }
-        }
-
-        ctx.restore();
-      };
-
-      const drawFurniture = (ctx, item, isPreview = false) => {
-        const template = FURNITURE_TEMPLATES[item.type];
-        if (!template) return;
-
-        const isSelected = item.id === selectedFurnitureId;
-
-        ctx.save();
-        ctx.translate(item.x, item.y);
-        ctx.rotate(item.rotation);
-
-        const { width, depth, label } = template;
-
-        ctx.beginPath();
-        ctx.rect(-width / 2, -depth / 2, width, depth);
-
-        ctx.fillStyle = isPreview ? "rgba(100, 100, 100, 0.5)" : (isSelected ? "#bfdbfe" : "#e5e7eb"); // 선택 시 연한 파란색
-        ctx.fill();
-        ctx.strokeStyle = isPreview ? "blue" : (isSelected ? "#2563eb" : "#4b5563"); // 선택 시 진한 파란색
-        ctx.lineWidth = (isSelected ? 3 : 2) / scale;
-        ctx.stroke();
-
-        // 선택된 경우 모서리 핸들 표시 (시각적 효과만)
-        if (isSelected) {
-          ctx.fillStyle = "#2563eb";
-          const handleSize = 6 / scale;
-          ctx.fillRect(-width / 2 - handleSize / 2, -depth / 2 - handleSize / 2, handleSize, handleSize);
-          ctx.fillRect(width / 2 - handleSize / 2, -depth / 2 - handleSize / 2, handleSize, handleSize);
-          ctx.fillRect(width / 2 - handleSize / 2, depth / 2 - handleSize / 2, handleSize, handleSize);
-          ctx.fillRect(-width / 2 - handleSize / 2, depth / 2 - handleSize / 2, handleSize, handleSize);
-        }
-
-        // 방향 표시 (앞쪽)
-        ctx.beginPath();
-        ctx.moveTo(-width / 4, depth / 2 - 5);
-        ctx.lineTo(width / 4, depth / 2 - 5);
-        ctx.stroke();
-
-        // 텍스트
-        ctx.fillStyle = "#000";
-        ctx.font = `${12 / scale}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.save();
-        ctx.rotate(-item.rotation); // 텍스트는 정방향 유지
-        ctx.fillText(label, 0, 0);
-        ctx.restore();
-
-        ctx.restore();
-      };
 
       const handleWheel = (e) => {
         if (mode !== '2D') return;
@@ -1906,7 +840,7 @@
 
         const worldPos = screenToWorld(e.clientX, e.clientY);
         // 마우스 다운 시에도 스냅 적용 (시작점 스냅)
-        const snapped = getSnappedPosition(worldPos.x, worldPos.y);
+        const snapped = getSnappedPositionWrapper(worldPos.x, worldPos.y);
         const x = snapped.x;
         const y = snapped.y;
 
@@ -1978,7 +912,7 @@
         const worldPos = screenToWorld(e.clientX, e.clientY);
 
         // 스마트 스냅 적용
-        const snapped = getSnappedPosition(worldPos.x, worldPos.y);
+        const snapped = getSnappedPositionWrapper(worldPos.x, worldPos.y);
         const x = snapped.x;
         const y = snapped.y;
 
