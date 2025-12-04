@@ -90,6 +90,25 @@ export const FURNITURE_CATEGORIES = {
             { id: 'light_led_kitchen', icon: '✨', label: '주방등(LED)' },
         ]
     },
+    'bathroom': {
+        icon: '🛁',
+        label: '욕실',
+        items: [
+            { id: 'bathtub', icon: '🛁', label: '욕조' },
+            { id: 'washbasin', icon: '🚿', label: '세면대' },
+            { id: 'toilet', icon: '🚽', label: '변기' },
+        ]
+    },
+    'kitchen': {
+        icon: '🍳',
+        label: '주방',
+        items: [
+            { id: 'sink_unit', icon: '🚰', label: '싱크대' },
+            { id: 'counter_unit', icon: '⬜', label: '조리대' },
+            { id: 'stove_unit', icon: '🔥', label: '가스레인지' },
+            { id: 'upper_cabinet', icon: '📦', label: '상부장' },
+        ]
+    },
     'desk': {
         icon: '🪑',
         label: '책상',
@@ -126,4 +145,45 @@ export const FURNITURE_TEMPLATES = {
     'light_led_kitchen': { label: '주방등(LED)', width: 80, depth: 20, height: 5, color: 0xffffff },
     'wardrobe': { label: '옷장', width: 90, depth: 60, height: 200, color: 0x8b4513 },
     'shoe_rack': { label: '신발장', width: 90, depth: 40, height: 100, color: 0x8b4513 },
+    // 욕실
+    'bathtub': { label: '욕조', width: 150, depth: 70, height: 55, color: 0xffffff },
+    'washbasin': { label: '세면대', width: 60, depth: 45, height: 85, color: 0xffffff },
+    'toilet': { label: '변기', width: 40, depth: 65, height: 45, color: 0xffffff },
+    // 주방
+    'sink_unit': { label: '싱크대', width: 80, depth: 60, height: 85, color: 0xffffff },
+    'counter_unit': { label: '조리대', width: 80, depth: 60, height: 85, color: 0xffffff },
+    'stove_unit': { label: '가스레인지', width: 60, depth: 60, height: 85, color: 0x333333 },
+    'upper_cabinet': { label: '상부장', width: 80, depth: 35, height: 70, color: 0xffffff },
 };
+
+// 벽지 재질 옵션
+export const WALL_MATERIALS = [
+    { id: 'white', label: '화이트', color: '#ffffff', pattern: 'solid' },
+    { id: 'ivory', label: '아이보리', color: '#fffef0', pattern: 'solid' },
+    { id: 'beige', label: '베이지', color: '#f5f5dc', pattern: 'solid' },
+    { id: 'light_gray', label: '라이트 그레이', color: '#e0e0e0', pattern: 'solid' },
+    { id: 'warm_gray', label: '웜 그레이', color: '#d4cfc9', pattern: 'solid' },
+    { id: 'mint', label: '민트', color: '#e8f5e9', pattern: 'solid' },
+    { id: 'sky_blue', label: '스카이 블루', color: '#e3f2fd', pattern: 'solid' },
+    { id: 'lavender', label: '라벤더', color: '#f3e5f5', pattern: 'solid' },
+    { id: 'stripe_gray', label: '스트라이프 그레이', color: '#f0f0f0', pattern: 'stripe', stripeColor: '#e0e0e0' },
+    { id: 'stripe_beige', label: '스트라이프 베이지', color: '#faf8f5', pattern: 'stripe', stripeColor: '#ebe5d9' },
+    { id: 'brick', label: '벽돌', color: '#c9785d', pattern: 'brick' },
+    { id: 'concrete', label: '콘크리트', color: '#9e9e9e', pattern: 'concrete' },
+];
+
+// 바닥재 재질 옵션
+export const FLOOR_MATERIALS = [
+    { id: 'wood_oak', label: '오크 원목', color: '#deb887', pattern: 'wood', grainColor: '#c9a76a' },
+    { id: 'wood_walnut', label: '월넛 원목', color: '#5d4037', pattern: 'wood', grainColor: '#4e342e' },
+    { id: 'wood_maple', label: '메이플 원목', color: '#f5deb3', pattern: 'wood', grainColor: '#deb887' },
+    { id: 'wood_cherry', label: '체리 원목', color: '#b5651d', pattern: 'wood', grainColor: '#8b4513' },
+    { id: 'laminate_gray', label: '그레이 강마루', color: '#9e9e9e', pattern: 'wood', grainColor: '#757575' },
+    { id: 'laminate_white', label: '화이트 강마루', color: '#f5f5f5', pattern: 'wood', grainColor: '#e0e0e0' },
+    { id: 'tile_white', label: '화이트 타일', color: '#ffffff', pattern: 'tile', groutColor: '#e0e0e0' },
+    { id: 'tile_gray', label: '그레이 타일', color: '#e0e0e0', pattern: 'tile', groutColor: '#bdbdbd' },
+    { id: 'tile_beige', label: '베이지 타일', color: '#f5f5dc', pattern: 'tile', groutColor: '#d4c9a8' },
+    { id: 'marble_white', label: '화이트 마블', color: '#fafafa', pattern: 'marble', veinColor: '#bdbdbd' },
+    { id: 'marble_black', label: '블랙 마블', color: '#424242', pattern: 'marble', veinColor: '#757575' },
+    { id: 'polished_concrete', label: '폴리싱 콘크리트', color: '#9e9e9e', pattern: 'concrete' },
+];
