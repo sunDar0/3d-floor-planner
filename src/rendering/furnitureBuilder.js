@@ -511,6 +511,235 @@ export const createFurnitureGroup = (item, offsetX, offsetZ) => {
         const neck = new THREE.Mesh(neckGeom, tvMat);
         neck.position.set(0, height + 7.5, 0);
         group.add(neck);
+    } else if (item.type === 'bathtub') {
+        // 욕조
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
+
+        // 외부 벽
+        const outerGeom = new THREE.BoxGeometry(width, height, depth);
+        const outer = new THREE.Mesh(outerGeom, whiteMat);
+        outer.position.y = height / 2;
+        outer.castShadow = true;
+        group.add(outer);
+
+        // 내부 (파인 부분) - 물색
+        const innerGeom = new THREE.BoxGeometry(width - 10, height - 10, depth - 10);
+        const waterMat = new THREE.MeshStandardMaterial({ color: 0x87ceeb, roughness: 0.1, metalness: 0.2 });
+        const inner = new THREE.Mesh(innerGeom, waterMat);
+        inner.position.y = height / 2 + 5;
+        group.add(inner);
+
+        // 수도꼭지
+        const faucetMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, roughness: 0.1, metalness: 0.8 });
+        const faucetBase = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 15, 16), faucetMat);
+        faucetBase.position.set(0, height + 7.5, -depth / 2 + 10);
+        group.add(faucetBase);
+
+        const faucetSpout = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 20, 16), faucetMat);
+        faucetSpout.rotation.x = Math.PI / 2;
+        faucetSpout.position.set(0, height + 12, -depth / 2 + 20);
+        group.add(faucetSpout);
+
+    } else if (item.type === 'washbasin') {
+        // 세면대
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
+
+        // 하부장
+        const cabinetGeom = new THREE.BoxGeometry(width, height - 20, depth);
+        const cabinet = new THREE.Mesh(cabinetGeom, whiteMat);
+        cabinet.position.y = (height - 20) / 2;
+        cabinet.castShadow = true;
+        group.add(cabinet);
+
+        // 상판 (세면기)
+        const topGeom = new THREE.BoxGeometry(width, 5, depth);
+        const top = new THREE.Mesh(topGeom, whiteMat);
+        top.position.y = height - 17.5;
+        group.add(top);
+
+        // 세면볼 (원형)
+        const bowlGeom = new THREE.CylinderGeometry(width / 3, width / 4, 12, 32);
+        const bowlMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.1 });
+        const bowl = new THREE.Mesh(bowlGeom, bowlMat);
+        bowl.position.y = height - 10;
+        group.add(bowl);
+
+        // 수도꼭지
+        const faucetMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, roughness: 0.1, metalness: 0.8 });
+        const faucetBase = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 20, 16), faucetMat);
+        faucetBase.position.set(0, height, -depth / 2 + 8);
+        group.add(faucetBase);
+
+    } else if (item.type === 'toilet') {
+        // 변기
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
+
+        // 베이스 (물탱크)
+        const tankGeom = new THREE.BoxGeometry(width - 5, height, 15);
+        const tank = new THREE.Mesh(tankGeom, whiteMat);
+        tank.position.set(0, height / 2, -depth / 2 + 7.5);
+        tank.castShadow = true;
+        group.add(tank);
+
+        // 변기 볼
+        const bowlGeom = new THREE.BoxGeometry(width, height - 5, depth - 15);
+        const bowl = new THREE.Mesh(bowlGeom, whiteMat);
+        bowl.position.set(0, (height - 5) / 2, 7.5);
+        bowl.castShadow = true;
+        group.add(bowl);
+
+        // 변기 뚜껑
+        const lidGeom = new THREE.BoxGeometry(width - 5, 3, depth - 20);
+        const lid = new THREE.Mesh(lidGeom, whiteMat);
+        lid.position.set(0, height - 3.5, 5);
+        group.add(lid);
+
+        // 변기 구멍 (어두운 색)
+        const holeGeom = new THREE.CylinderGeometry(width / 3, width / 3, 2, 32);
+        const holeMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const hole = new THREE.Mesh(holeGeom, holeMat);
+        hole.position.set(0, height - 6, 5);
+        group.add(hole);
+
+    } else if (item.type === 'sink_unit') {
+        // 싱크대 (싱크 홀 포함)
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        const steelMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, roughness: 0.2, metalness: 0.6 });
+
+        // 하부장
+        const cabinetGeom = new THREE.BoxGeometry(width, height - 5, depth);
+        const cabinet = new THREE.Mesh(cabinetGeom, whiteMat);
+        cabinet.position.y = (height - 5) / 2;
+        cabinet.castShadow = true;
+        group.add(cabinet);
+
+        // 문
+        const doorGeom = new THREE.BoxGeometry(width / 2 - 2, height - 15, 2);
+        const door1 = new THREE.Mesh(doorGeom, whiteMat);
+        door1.position.set(-width / 4, (height - 5) / 2, depth / 2 + 1);
+        group.add(door1);
+        const door2 = new THREE.Mesh(doorGeom, whiteMat);
+        door2.position.set(width / 4, (height - 5) / 2, depth / 2 + 1);
+        group.add(door2);
+
+        // 상판 (스테인리스)
+        const topGeom = new THREE.BoxGeometry(width, 5, depth);
+        const top = new THREE.Mesh(topGeom, steelMat);
+        top.position.y = height - 2.5;
+        group.add(top);
+
+        // 싱크 홀 (사각형)
+        const sinkGeom = new THREE.BoxGeometry(width - 20, 15, depth - 15);
+        const sinkMat = new THREE.MeshStandardMaterial({ color: 0xa0a0a0, roughness: 0.1, metalness: 0.5 });
+        const sink = new THREE.Mesh(sinkGeom, sinkMat);
+        sink.position.y = height - 10;
+        group.add(sink);
+
+        // 수도꼭지
+        const faucetMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, roughness: 0.1, metalness: 0.8 });
+        const faucetBase = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 25, 16), faucetMat);
+        faucetBase.position.set(0, height + 10, -depth / 2 + 10);
+        group.add(faucetBase);
+
+        const faucetSpout = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 15, 16), faucetMat);
+        faucetSpout.rotation.x = Math.PI / 2;
+        faucetSpout.position.set(0, height + 20, -depth / 2 + 17);
+        group.add(faucetSpout);
+
+    } else if (item.type === 'counter_unit') {
+        // 조리대 (상판만 있는 하부장)
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        const topMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.2 }); // 인조대리석
+
+        // 하부장
+        const cabinetGeom = new THREE.BoxGeometry(width, height - 5, depth);
+        const cabinet = new THREE.Mesh(cabinetGeom, whiteMat);
+        cabinet.position.y = (height - 5) / 2;
+        cabinet.castShadow = true;
+        group.add(cabinet);
+
+        // 문
+        const doorGeom = new THREE.BoxGeometry(width / 2 - 2, height - 15, 2);
+        const door1 = new THREE.Mesh(doorGeom, whiteMat);
+        door1.position.set(-width / 4, (height - 5) / 2, depth / 2 + 1);
+        group.add(door1);
+        const door2 = new THREE.Mesh(doorGeom, whiteMat);
+        door2.position.set(width / 4, (height - 5) / 2, depth / 2 + 1);
+        group.add(door2);
+
+        // 상판
+        const topGeom = new THREE.BoxGeometry(width, 5, depth);
+        const top = new THREE.Mesh(topGeom, topMat);
+        top.position.y = height - 2.5;
+        group.add(top);
+
+    } else if (item.type === 'stove_unit') {
+        // 가스레인지
+        const blackMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.3 });
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+
+        // 하부장
+        const cabinetGeom = new THREE.BoxGeometry(width, height - 5, depth);
+        const cabinet = new THREE.Mesh(cabinetGeom, whiteMat);
+        cabinet.position.y = (height - 5) / 2;
+        cabinet.castShadow = true;
+        group.add(cabinet);
+
+        // 상판 (검정)
+        const topGeom = new THREE.BoxGeometry(width, 5, depth);
+        const top = new THREE.Mesh(topGeom, blackMat);
+        top.position.y = height - 2.5;
+        group.add(top);
+
+        // 버너 (4구)
+        const burnerMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2 });
+        const burnerPositions = [
+            { x: -width / 4, z: -depth / 4 },
+            { x: width / 4, z: -depth / 4 },
+            { x: -width / 4, z: depth / 4 },
+            { x: width / 4, z: depth / 4 }
+        ];
+
+        burnerPositions.forEach(pos => {
+            const burner = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 2, 32), burnerMat);
+            burner.position.set(pos.x, height, pos.z);
+            group.add(burner);
+
+            // 받침대
+            const grate = new THREE.Mesh(new THREE.TorusGeometry(6, 1, 8, 16), burnerMat);
+            grate.rotation.x = Math.PI / 2;
+            grate.position.set(pos.x, height + 2, pos.z);
+            group.add(grate);
+        });
+
+    } else if (item.type === 'upper_cabinet') {
+        // 상부장 (천장 근처에 설치)
+        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+
+        // 캐비닛 본체
+        const cabinetGeom = new THREE.BoxGeometry(width, height, depth);
+        const cabinet = new THREE.Mesh(cabinetGeom, whiteMat);
+        cabinet.position.y = height / 2 + 130; // 바닥에서 130cm 위에 설치
+        cabinet.castShadow = true;
+        group.add(cabinet);
+
+        // 문
+        const doorGeom = new THREE.BoxGeometry(width / 2 - 2, height - 4, 2);
+        const door1 = new THREE.Mesh(doorGeom, whiteMat);
+        door1.position.set(-width / 4, height / 2 + 130, depth / 2 + 1);
+        group.add(door1);
+        const door2 = new THREE.Mesh(doorGeom, whiteMat);
+        door2.position.set(width / 4, height / 2 + 130, depth / 2 + 1);
+        group.add(door2);
+
+        // 손잡이
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.5 });
+        const handle1 = new THREE.Mesh(new THREE.BoxGeometry(2, 8, 2), handleMat);
+        handle1.position.set(-5, height / 2 + 130, depth / 2 + 3);
+        group.add(handle1);
+        const handle2 = new THREE.Mesh(new THREE.BoxGeometry(2, 8, 2), handleMat);
+        handle2.position.set(5, height / 2 + 130, depth / 2 + 3);
+        group.add(handle2);
     }
     return group;
 };
