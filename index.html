@@ -39,7 +39,8 @@
       GRID_SIZE, VISUAL_GRID_SIZE, WALL_THICKNESS, WALL_HEIGHT,
       DOOR_WIDTH, DOOR_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_SILL,
       BALCONY_WIDTH, BALCONY_HEIGHT, HEIGHT_MALE, HEIGHT_FEMALE,
-      TOOLS, FURNITURE_CATEGORIES, FURNITURE_TEMPLATES
+      TOOLS, FURNITURE_CATEGORIES, FURNITURE_TEMPLATES,
+      WALL_MATERIALS, FLOOR_MATERIALS
     } from './src/config/constants.js';
 
     import { snapToGrid, distance, projectPointOnLine } from './src/utils/geometry.js';
@@ -60,7 +61,7 @@
 
 
     // --- 3D 뷰어 컴포넌트 ---
-    const Viewer3D = ({ walls, rooms, openings, furniture = [] }) => {
+    const Viewer3D = ({ walls, rooms, openings, furniture = [], wallMaterialId = 'white', floorMaterialId = 'wood_oak' }) => {
       const mountRef = useRef(null);
       const [isFPV, setIsFPV] = useState(false);
       const [gender, setGender] = useState('male'); // 'male' | 'female'
@@ -87,8 +88,8 @@
       });
 
       // useMemo로 텍스처 및 재질 캐싱
-      const floorTexture = useMemo(() => createFloorTexture(), []);
-      const wallTexture = useMemo(() => createWallTexture(), []);
+      const floorTexture = useMemo(() => createFloorTexture(floorMaterialId), [floorMaterialId]);
+      const wallTexture = useMemo(() => createWallTexture(wallMaterialId), [wallMaterialId]);
 
       const floorMaterial = useMemo(() => new THREE.MeshStandardMaterial({
         map: floorTexture,
@@ -357,7 +358,7 @@
           document.removeEventListener('keydown', onKeyDown);
           document.removeEventListener('keyup', onKeyUp);
         };
-      }, [walls, rooms, openings, furniture]);
+      }, [walls, rooms, openings, furniture, wallMaterialId, floorMaterialId, floorMaterial, wallMaterial, ceilingMaterial]);
 
       // Mode Switching Effect
       useEffect(() => {
@@ -448,28 +449,28 @@
 
       useEffect(() => {
         const handleClickOutside = (event) => {
-            if (toolbarRef.current && !toolbarRef.current.contains(event.target)) {
-                setOpenCategory(null);
-            }
+          if (toolbarRef.current && !toolbarRef.current.contains(event.target)) {
+            setOpenCategory(null);
+          }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
+          document.removeEventListener("mousedown", handleClickOutside);
         };
       }, [toolbarRef]);
 
       const handleCategoryClick = (key, category) => {
         if (category.isDirect) {
-            setTool(category.items[0].id);
-            setOpenCategory(null);
+          setTool(category.items[0].id);
+          setOpenCategory(null);
         } else {
-            setOpenCategory(openCategory === key ? null : key);
+          setOpenCategory(openCategory === key ? null : key);
         }
       };
 
       const handleItemClick = (id) => {
-          setTool(id);
-          setOpenCategory(null);
+        setTool(id);
+        setOpenCategory(null);
       };
 
       return (
@@ -498,38 +499,36 @@
               {/* 가구 툴바 */}
               {Object.entries(FURNITURE_CATEGORIES).map(([key, category]) => (
                 <div key={key} className="relative">
-                    <button
-                        onClick={() => handleCategoryClick(key, category)}
-                        className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-10 h-10 ${
-                            (openCategory === key || (category.items.some(item => item.id === tool)))
-                                ? 'bg-white text-blue-600 shadow-md scale-105'
-                                : 'text-gray-600 hover:bg-gray-200/80 hover:text-gray-900'
-                        }`}
-                        title={category.label}
-                    >
-                        <span className="text-lg leading-none">{category.icon}</span>
-                    </button>
-                    {openCategory === key && !category.isDirect && (
-                        <div className="absolute top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-20 p-2">
-                            <div className="grid grid-cols-3 gap-2">
-                                {category.items.map(item => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => handleItemClick(item.id)}
-                                        className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-full h-16 ${
-                                            tool === item.id
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                        title={item.label}
-                                    >
-                                        <span className="text-xl leading-none">{item.icon}</span>
-                                        <span className="text-[10px] mt-1">{item.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                  <button
+                    onClick={() => handleCategoryClick(key, category)}
+                    className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-10 h-10 ${(openCategory === key || (category.items.some(item => item.id === tool)))
+                      ? 'bg-white text-blue-600 shadow-md scale-105'
+                      : 'text-gray-600 hover:bg-gray-200/80 hover:text-gray-900'
+                      }`}
+                    title={category.label}
+                  >
+                    <span className="text-lg leading-none">{category.icon}</span>
+                  </button>
+                  {openCategory === key && !category.isDirect && (
+                    <div className="absolute top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-20 p-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {category.items.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleItemClick(item.id)}
+                            className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-full h-16 ${tool === item.id
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'text-gray-600 hover:bg-gray-100'
+                              }`}
+                            title={item.label}
+                          >
+                            <span className="text-xl leading-none">{item.icon}</span>
+                            <span className="text-[10px] mt-1">{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -653,6 +652,10 @@
 
       // 스마트 가이드 상태
       const [guides, setGuides] = useState([]); // [{ type: 'x'|'y', pos: number, start: number, end: number }]
+
+      // 재질 선택 상태
+      const [wallMaterialId, setWallMaterialId] = useState('white');
+      const [floorMaterialId, setFloorMaterialId] = useState('wood_oak');
 
       const canvasRef = useRef(null);
 
@@ -809,7 +812,7 @@
         drawGrid(ctx, canvas, scale, pan);
 
         // 1. 방 그리기
-        rooms.forEach(room => drawRoom(ctx, room.points, false, scale));
+        rooms.forEach(room => drawRoom(ctx, room.points, false, scale, floorMaterialId));
         if (currentRoom.length > 0) {
           drawRoom(ctx, currentRoom, true, scale);
           ctx.beginPath();
@@ -822,7 +825,7 @@
         }
 
         // 2. 벽 그리기
-        walls.forEach(wall => drawWall(ctx, wall, 'black', scale));
+        walls.forEach(wall => drawWall(ctx, wall, 'black', scale, false, wallMaterialId));
         if (currentWall) drawWall(ctx, currentWall, 'red', scale, true);
 
         // 3. 오프닝 그리기
@@ -1123,30 +1126,180 @@
                   onWheel={handleWheel}
                   className="block"
                 />
-                <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 max-w-xs transition-all duration-300 pointer-events-none z-20">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-2xl">{TOOLS.find(t => t.id === tool)?.icon || allFurnitureTools.find(t => t.id === tool)?.icon || '👆'}</span>
-                    <h3 className="font-bold text-gray-800 text-sm">
-                      {TOOLS.find(t => t.id === tool)?.label || allFurnitureTools.find(t => t.id === tool)?.label || '선택 모드'}
-                    </h3>
+                {/* 2D 정보 패널 영역 - flex로 두 패널을 나란히 배치 */}
+                <div className="absolute top-6 left-6 flex items-start gap-4 z-20 pointer-events-none">
+                  {/* 도구 정보 패널 */}
+                  <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-64 transition-all duration-300">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-2xl">{TOOLS.find(t => t.id === tool)?.icon || allFurnitureTools.find(t => t.id === tool)?.icon || '👆'}</span>
+                      <h3 className="font-bold text-gray-800 text-sm">
+                        {TOOLS.find(t => t.id === tool)?.label || allFurnitureTools.find(t => t.id === tool)?.label || '선택 모드'}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {tool === 'select' && "객체를 클릭하여 선택하거나 드래그하여 이동하세요."}
+                      {tool === 'wall' && "마우스를 드래그하여 벽을 그리세요. Shift를 누르면 수직/수평으로 고정됩니다."}
+                      {tool === 'room' && "드래그하여 사각형 방을 만드세요."}
+                      {(tool === 'door' || tool === 'window' || tool === 'balcony') && "벽 위에 마우스를 올려 배치하세요."}
+                      {FURNITURE_TEMPLATES[tool] && "원하는 위치에 클릭하여 배치하세요."}
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-[10px] text-gray-500">
+                      <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">🖱️</span> 이동/줌</div>
+                      {FURNITURE_TEMPLATES[tool] && <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">R</span> 회전</div>}
+                      <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">⌫</span> 삭제</div>
+                      <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">Esc</span> 취소</div>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    {tool === 'select' && "객체를 클릭하여 선택하거나 드래그하여 이동하세요."}
-                    {tool === 'wall' && "마우스를 드래그하여 벽을 그리세요. Shift를 누르면 수직/수평으로 고정됩니다."}
-                    {tool === 'room' && "드래그하여 사각형 방을 만드세요."}
-                    {(tool === 'door' || tool === 'window' || tool === 'balcony') && "벽 위에 마우스를 올려 배치하세요."}
-                    {FURNITURE_TEMPLATES[tool] && "원하는 위치에 클릭하여 배치하세요."}
-                  </p>
-                  <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-[10px] text-gray-500">
-                    <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">🖱️</span> 이동/줌</div>
-                    {FURNITURE_TEMPLATES[tool] && <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">R</span> 회전</div>}
-                    <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">⌫</span> 삭제</div>
-                    <div className="flex items-center"><span className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center mr-1">Esc</span> 취소</div>
-                  </div>
+
+                  {/* 재질 선택 패널 - 벽 또는 방 도구 선택 시에만 표시 */}
+                  {(tool === 'wall' || tool === 'room') && (
+                    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-56 pointer-events-auto">
+                      <h4 className="font-bold text-gray-800 text-xs mb-3 flex items-center">
+                        <span className="mr-2">🎨</span>
+                        {tool === 'wall' ? '벽지 선택' : '바닥재 선택'}
+                      </h4>
+
+                      {tool === 'wall' ? (
+                        <>
+                          <div className="grid grid-cols-4 gap-2">
+                            {WALL_MATERIALS.map(mat => (
+                              <button
+                                key={mat.id}
+                                onClick={() => setWallMaterialId(mat.id)}
+                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${wallMaterialId === mat.id
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-400'
+                                  }`}
+                                title={mat.label}
+                              >
+                                <div
+                                  className="w-8 h-8 rounded mb-1"
+                                  style={{ backgroundColor: mat.color }}
+                                />
+                                <span className="text-[9px] text-gray-600 text-center leading-tight truncate w-full">
+                                  {mat.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-100">
+                            현재: <strong>{WALL_MATERIALS.find(m => m.id === wallMaterialId)?.label}</strong>
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-4 gap-2">
+                            {FLOOR_MATERIALS.map(mat => (
+                              <button
+                                key={mat.id}
+                                onClick={() => setFloorMaterialId(mat.id)}
+                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${floorMaterialId === mat.id
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-400'
+                                  }`}
+                                title={mat.label}
+                              >
+                                <div
+                                  className="w-8 h-8 rounded mb-1"
+                                  style={{ backgroundColor: mat.color }}
+                                />
+                                <span className="text-[9px] text-gray-600 text-center leading-tight truncate w-full">
+                                  {mat.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-100">
+                            현재: <strong>{FLOOR_MATERIALS.find(m => m.id === floorMaterialId)?.label}</strong>
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <Viewer3D walls={walls} rooms={rooms} openings={openings} furniture={furniture} />
+              <>
+                <Viewer3D walls={walls} rooms={rooms} openings={openings} furniture={furniture} wallMaterialId={wallMaterialId} floorMaterialId={floorMaterialId} />
+                {/* 재질 선택 패널 */}
+                <div className="absolute top-6 left-6 bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-72 z-20 max-h-[80vh] overflow-y-auto">
+                  <h3 className="font-bold text-gray-800 text-sm mb-4 flex items-center">
+                    <span className="mr-2">🎨</span> 재질 변경
+                  </h3>
+
+                  {/* 벽지 선택 */}
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-gray-600 mb-2">벽지</h4>
+                    <div className="grid grid-cols-4 gap-2">
+                      {WALL_MATERIALS.map(mat => (
+                        <button
+                          key={mat.id}
+                          onClick={() => setWallMaterialId(mat.id)}
+                          className={`w-full aspect-square rounded-lg border-2 transition-all ${wallMaterialId === mat.id
+                            ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
+                            : 'border-gray-200 hover:border-gray-400'
+                            }`}
+                          style={{ backgroundColor: mat.color }}
+                          title={mat.label}
+                        >
+                          {mat.pattern === 'stripe' && (
+                            <div className="w-full h-full flex">
+                              <div className="w-1/2 h-full" style={{ backgroundColor: mat.stripeColor }}></div>
+                            </div>
+                          )}
+                          {mat.pattern === 'brick' && (
+                            <div className="w-full h-full flex flex-wrap">
+                              <div className="w-full h-1/3 border-b border-gray-400"></div>
+                              <div className="w-1/2 h-1/3 border-r border-t border-gray-400"></div>
+                              <div className="w-1/2 h-1/3 border-t border-gray-400"></div>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {WALL_MATERIALS.find(m => m.id === wallMaterialId)?.label}
+                    </p>
+                  </div>
+
+                  {/* 바닥재 선택 */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-600 mb-2">바닥재</h4>
+                    <div className="grid grid-cols-4 gap-2">
+                      {FLOOR_MATERIALS.map(mat => (
+                        <button
+                          key={mat.id}
+                          onClick={() => setFloorMaterialId(mat.id)}
+                          className={`w-full aspect-square rounded-lg border-2 transition-all ${floorMaterialId === mat.id
+                            ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
+                            : 'border-gray-200 hover:border-gray-400'
+                            }`}
+                          style={{ backgroundColor: mat.color }}
+                          title={mat.label}
+                        >
+                          {mat.pattern === 'wood' && (
+                            <div className="w-full h-full flex flex-col justify-evenly">
+                              {[...Array(4)].map((_, i) => (
+                                <div key={i} className="w-full h-0.5" style={{ backgroundColor: mat.grainColor, opacity: 0.5 }}></div>
+                              ))}
+                            </div>
+                          )}
+                          {mat.pattern === 'tile' && (
+                            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px" style={{ backgroundColor: mat.groutColor }}>
+                              {[...Array(4)].map((_, i) => (
+                                <div key={i} style={{ backgroundColor: mat.color }}></div>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {FLOOR_MATERIALS.find(m => m.id === floorMaterialId)?.label}
+                    </p>
+                  </div>
+                </div>
+              </>
             )}
             <HelpButton />
           </div>

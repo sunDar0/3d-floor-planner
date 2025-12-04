@@ -1,12 +1,26 @@
 import {
-    VISUAL_GRID_SIZE, DOOR_WIDTH, WINDOW_WIDTH, BALCONY_WIDTH, FURNITURE_TEMPLATES
+    VISUAL_GRID_SIZE, DOOR_WIDTH, WINDOW_WIDTH, BALCONY_WIDTH, FURNITURE_TEMPLATES,
+    WALL_MATERIALS, FLOOR_MATERIALS
 } from '../config/constants.js';
 import { distance } from '../utils/geometry.js';
 
 /**
+ * 재질 ID로 색상 가져오기
+ */
+const getFloorColor = (materialId) => {
+    const mat = FLOOR_MATERIALS.find(m => m.id === materialId);
+    return mat ? mat.color : '#e0e7ff';
+};
+
+const getWallColor = (materialId) => {
+    const mat = WALL_MATERIALS.find(m => m.id === materialId);
+    return mat ? mat.color : '#9ca3af';
+};
+
+/**
  * 방 그리기
  */
-export const drawRoom = (ctx, points, isPreview = false, scale) => {
+export const drawRoom = (ctx, points, isPreview = false, scale, floorMaterialId = null) => {
     if (points.length < 2) return;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -15,7 +29,15 @@ export const drawRoom = (ctx, points, isPreview = false, scale) => {
     }
     if (!isPreview) ctx.closePath();
 
-    ctx.fillStyle = isPreview ? "rgba(59, 130, 246, 0.2)" : "rgba(224, 231, 255, 0.5)";
+    // 재질 색상 적용
+    if (isPreview) {
+        ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
+    } else if (floorMaterialId) {
+        const baseColor = getFloorColor(floorMaterialId);
+        ctx.fillStyle = baseColor + 'aa'; // 투명도 추가
+    } else {
+        ctx.fillStyle = "rgba(224, 231, 255, 0.5)";
+    }
     ctx.fill();
     ctx.strokeStyle = isPreview ? "blue" : "#a5b4fc";
     ctx.lineWidth = 2 / scale;
@@ -51,9 +73,14 @@ export const drawRoom = (ctx, points, isPreview = false, scale) => {
 /**
  * 벽 그리기
  */
-export const drawWall = (ctx, wall, color, scale, isGuide = false) => {
+export const drawWall = (ctx, wall, color, scale, isGuide = false, wallMaterialId = null) => {
     ctx.beginPath();
-    ctx.strokeStyle = color;
+    // 재질 색상 적용
+    if (wallMaterialId && !isGuide) {
+        ctx.strokeStyle = getWallColor(wallMaterialId);
+    } else {
+        ctx.strokeStyle = color;
+    }
     ctx.lineWidth = (isGuide ? 2 : 4) / scale;
     ctx.lineCap = "round";
     ctx.moveTo(wall.start.x, wall.start.y);
