@@ -49,6 +49,8 @@ export const createRoomObjects = (room, floorMaterial, ceilingMaterial, offsetX,
     ceilingMesh.rotation.x = Math.PI / 2; // 바닥과 같은 방향 (뒤집힘 주의)
     ceilingMesh.position.y = WALL_HEIGHT; // 벽 높이에 배치
     ceilingMesh.visible = false; // 기본적으로 숨김 (FPV에서만 표시)
+    ceilingMesh.castShadow = true; // 그림자 생성 (태양광 차단)
+    ceilingMesh.receiveShadow = true;
 
     return { floorMesh, ceilingMesh };
 };
@@ -64,21 +66,47 @@ export const createWallObjects = (wall, index, openings, wallMaterial, offsetX, 
     const doors = [];
     let mesh = null;
 
+    // 기둥 생성 함수 (양쪽 끝을 둥글게 처리)
+    const createPillar = (x, y, z) => {
+        const geometry = new THREE.CylinderGeometry(WALL_THICKNESS / 2, WALL_THICKNESS / 2, WALL_HEIGHT, 16);
+        const pillar = new THREE.Mesh(geometry, wallMat);
+        pillar.position.set(x, y, z);
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        return pillar;
+    };
+
     if (wallOpenings.length === 0) {
-        const geometry = new THREE.BoxGeometry(len, WALL_HEIGHT, WALL_THICKNESS);
-        mesh = new THREE.Mesh(geometry, wallMat);
+        const group = new THREE.Group();
         const cx = (wall.start.x + wall.end.x) / 2;
         const cz = (wall.start.y + wall.end.y) / 2;
-        mesh.position.set(cx + offsetX, WALL_HEIGHT / 2, cz + offsetZ);
-        mesh.rotation.y = -angle;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+
+        // 그룹 위치를 벽의 중심으로 설정 (높이는 0)
+        group.position.set(cx + offsetX, 0, cz + offsetZ);
+        group.rotation.y = -angle;
+
+        // 벽 메쉬
+        const geometry = new THREE.BoxGeometry(len, WALL_HEIGHT, WALL_THICKNESS);
+        const wallMesh = new THREE.Mesh(geometry, wallMat);
+        wallMesh.position.set(0, WALL_HEIGHT / 2, 0);
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        group.add(wallMesh);
+
+        // 양쪽 끝 기둥 추가
+        group.add(createPillar(-len / 2, WALL_HEIGHT / 2, 0));
+        group.add(createPillar(len / 2, WALL_HEIGHT / 2, 0));
+
+        mesh = group;
     } else {
         wallOpenings.sort((a, b) => a.t - b.t);
         let currentPos = 0;
         const wallGroup = new THREE.Group();
         wallGroup.position.set(wall.start.x + offsetX, 0, wall.start.y + offsetZ);
         wallGroup.rotation.y = -angle;
+
+        // 시작점 기둥
+        wallGroup.add(createPillar(0, WALL_HEIGHT / 2, 0));
 
         wallOpenings.forEach(op => {
             const opPos = op.t * len;
@@ -245,6 +273,10 @@ export const createWallObjects = (wall, index, openings, wallMaterial, offsetX, 
             mesh.receiveShadow = true;
             wallGroup.add(mesh);
         }
+
+        // 끝점 기둥
+        wallGroup.add(createPillar(len, WALL_HEIGHT / 2, 0));
+
         mesh = wallGroup;
     }
 
