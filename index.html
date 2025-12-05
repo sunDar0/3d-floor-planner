@@ -138,10 +138,10 @@
         rendererRef.current = renderer;
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // 0.1 -> 0.02 (거의 암흑)
         scene.add(ambientLight);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.02); // 0.1 -> 0.02
         hemiLight.position.set(0, 200, 0);
         scene.add(hemiLight);
 
@@ -1167,8 +1167,8 @@
                                 key={mat.id}
                                 onClick={() => setWallMaterialId(mat.id)}
                                 className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${wallMaterialId === mat.id
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-400'
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-400'
                                   }`}
                                 title={mat.label}
                               >
@@ -1194,8 +1194,8 @@
                                 key={mat.id}
                                 onClick={() => setFloorMaterialId(mat.id)}
                                 className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${floorMaterialId === mat.id
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-400'
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-400'
                                   }`}
                                 title={mat.label}
                               >
