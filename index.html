@@ -51,6 +51,7 @@
     import { createRoomObjects, createWallObjects } from './src/rendering/sceneBuilder.js';
     import { createFurnitureGroup } from './src/rendering/furnitureBuilder.js';
     import { downloadFloorPlan, uploadFloorPlan } from './src/utils/fileHandler.js';
+    import { findClosedRegion } from './src/utils/roomDetection.js';
     import { useHistory } from './src/hooks/useHistory.js';
 
     const { useState, useEffect, useRef, useMemo, useCallback } = React;
@@ -182,8 +183,10 @@
           const result = createRoomObjects(room, floorMaterial, ceilingMaterial, offsetX, offsetZ);
           if (result) {
             scene.add(result.floorMesh);
-            scene.add(result.ceilingMesh);
-            ceilingsRef.current.push(result.ceilingMesh);
+            if (result.ceilingMesh) {
+              scene.add(result.ceilingMesh);
+              ceilingsRef.current.push(result.ceilingMesh);
+            }
           }
         });
 
@@ -1056,9 +1059,21 @@
 
         if (tool === 'wall' && currentWall) {
           if (currentWall.start.x !== currentWall.end.x || currentWall.start.y !== currentWall.end.y) {
+            // 닫힌 영역(방) 감지
+            const newRoomPoints = findClosedRegion(walls, currentWall);
+
+            const newWalls = [...walls, currentWall];
+            let newRooms = rooms;
+
+            if (newRoomPoints) {
+              // 방이 감지되면 자동으로 추가
+              newRooms = [...rooms, { points: newRoomPoints }];
+            }
+
             pushState({
               ...state,
-              walls: [...walls, currentWall]
+              walls: newWalls,
+              rooms: newRooms
             });
           }
           setCurrentWall(null);
@@ -1066,7 +1081,7 @@
           if (currentRoom[0].x !== currentRoom[2].x || currentRoom[0].y !== currentRoom[2].y) {
             pushState({
               ...state,
-              rooms: [...rooms, { points: currentRoom }]
+              rooms: [...rooms, { points: currentRoom, hasCeiling: false }]
             });
           }
           setCurrentRoom([]);

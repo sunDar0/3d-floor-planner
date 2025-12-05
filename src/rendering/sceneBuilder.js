@@ -34,23 +34,26 @@ export const createRoomObjects = (room, floorMaterial, ceilingMaterial, offsetX,
     floorMesh.position.y = 0.5;
     floorMesh.receiveShadow = true;
 
-    // 천장 생성 (Smart Ceiling)
-    const ceilingGeom = new THREE.ShapeGeometry(shape);
-    // UV 매핑
-    const cPosAttribute = ceilingGeom.attributes.position;
-    const cUvAttribute = ceilingGeom.attributes.uv;
-    for (let i = 0; i < cPosAttribute.count; i++) {
-        const x = cPosAttribute.getX(i);
-        const y = cPosAttribute.getY(i);
-        cUvAttribute.setXY(i, x / 500, y / 500);
-    }
+    // 천장 생성 (옵션에 따라 결정)
+    let ceilingMesh = null;
+    if (room.hasCeiling !== false) { // 기본값은 true
+        const ceilingGeom = new THREE.ShapeGeometry(shape);
+        // UV 매핑
+        const cPosAttribute = ceilingGeom.attributes.position;
+        const cUvAttribute = ceilingGeom.attributes.uv;
+        for (let i = 0; i < cPosAttribute.count; i++) {
+            const x = cPosAttribute.getX(i);
+            const y = cPosAttribute.getY(i);
+            cUvAttribute.setXY(i, x / 500, y / 500);
+        }
 
-    const ceilingMesh = new THREE.Mesh(ceilingGeom, ceilingMaterial);
-    ceilingMesh.rotation.x = Math.PI / 2; // 바닥과 같은 방향 (뒤집힘 주의)
-    ceilingMesh.position.y = WALL_HEIGHT; // 벽 높이에 배치
-    ceilingMesh.visible = false; // 기본적으로 숨김 (FPV에서만 표시)
-    ceilingMesh.castShadow = true; // 그림자 생성 (태양광 차단)
-    ceilingMesh.receiveShadow = true;
+        ceilingMesh = new THREE.Mesh(ceilingGeom, ceilingMaterial);
+        ceilingMesh.rotation.x = Math.PI / 2;
+        ceilingMesh.position.y = WALL_HEIGHT;
+        ceilingMesh.visible = false; // 기본적으로 숨김 (FPV에서만 표시)
+        ceilingMesh.castShadow = true;
+        ceilingMesh.receiveShadow = true;
+    }
 
     return { floorMesh, ceilingMesh };
 };
