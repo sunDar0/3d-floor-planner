@@ -51,8 +51,8 @@ export const FURNITURE_CATEGORIES = {
         icon: '📚',
         label: '수납',
         items: [
-            { id: 'bookshelf_160', icon: '📚', label: '책장(160)' },
-            { id: 'bookshelf_100', icon: '📚', label: '책장(100)' },
+            { id: 'bookshelf_160', icon: '📚', label: '책장(150)' },
+            { id: 'bookshelf_100', icon: '📚', label: '책장(80)' },
             { id: 'tv_stand', icon: '📺', label: 'TV장' },
             { id: 'wardrobe', icon: '🚪', label: '옷장' },
             { id: 'shoe_rack', icon: '👞', label: '신발장' },
@@ -120,14 +120,14 @@ export const FURNITURE_CATEGORIES = {
 };
 
 export const FURNITURE_TEMPLATES = {
-    'desk': { label: '책상', width: 160, depth: 80, height: 75, color: 0x8b4513 },
+    'desk': { label: '책상', width: 150, depth: 70, height: 75, color: 0x8b4513 },
     'sofa_2p': { label: '소파 2인', width: 160, depth: 80, height: 85, color: 0x9ca3af },
     'sofa_3p': { label: '소파 3인', width: 210, depth: 80, height: 85, color: 0x9ca3af },
     'bed_single': { label: '침대 S', width: 100, depth: 200, height: 50, color: 0xffffff },
     'bed_queen': { label: '침대 Q', width: 150, depth: 200, height: 50, color: 0xffffff },
     'bed_king': { label: '침대 K', width: 180, depth: 200, height: 50, color: 0xffffff },
-    'bookshelf_160': { label: '책장 160', width: 160, depth: 30, height: 200, color: 0x8b4513 },
-    'bookshelf_100': { label: '책장 100', width: 100, depth: 30, height: 200, color: 0x8b4513 },
+    'bookshelf_160': { label: '책장 150', width: 150, depth: 30, height: 200, color: 0x8b4513 },
+    'bookshelf_100': { label: '책장 80', width: 80, depth: 30, height: 200, color: 0x8b4513 },
     'fridge_double': { label: '냉장고(양문)', width: 95, depth: 90, height: 185, color: 0xe5e7eb },
     'fridge_single': { label: '냉장고(단문)', width: 60, depth: 70, height: 185, color: 0xe5e7eb },
     'dining_table_4p': { label: '식탁 4인', width: 120, depth: 80, height: 75, color: 0xd4a373 },
@@ -144,7 +144,7 @@ export const FURNITURE_TEMPLATES = {
     'light_led_room': { label: '방등(LED)', width: 50, depth: 50, height: 5, color: 0xffffff },
     'light_led_kitchen': { label: '주방등(LED)', width: 80, depth: 20, height: 5, color: 0xffffff },
     'wardrobe': { label: '옷장', width: 90, depth: 60, height: 200, color: 0x8b4513 },
-    'shoe_rack': { label: '신발장', width: 90, depth: 40, height: 100, color: 0x8b4513 },
+    'shoe_rack': { label: '신발장', width: 80, depth: 40, height: 100, color: 0x8b4513 },
     // 욕실
     'bathtub': { label: '욕조', width: 150, depth: 70, height: 55, color: 0xffffff },
     'washbasin': { label: '세면대', width: 60, depth: 45, height: 85, color: 0xffffff },
