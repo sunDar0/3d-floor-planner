@@ -391,7 +391,7 @@ export const createFurnitureGroup = (item, offsetX, offsetZ) => {
             group.add(panel);
 
             // Point Light for illumination
-            const light = new THREE.PointLight(lightColor, 0.4, 300);
+            const light = new THREE.PointLight(lightColor, 0.8, 500); // 강도 0.4 -> 0.8, 거리 300 -> 500
             light.position.y = -10;
             group.add(light);
         } else {
@@ -421,7 +421,7 @@ export const createFurnitureGroup = (item, offsetX, offsetZ) => {
             group.add(tube2);
 
             // Point Light
-            const light = new THREE.PointLight(lightColor, 0.3, 300);
+            const light = new THREE.PointLight(lightColor, 0.6, 500); // 강도 0.3 -> 0.6, 거리 300 -> 500
             light.position.y = -20;
             group.add(light);
         }
