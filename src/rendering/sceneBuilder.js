@@ -1,12 +1,56 @@
 import {
-    WALL_HEIGHT, WALL_THICKNESS, DOOR_WIDTH, DOOR_HEIGHT,
-    WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_SILL,
-    BALCONY_WIDTH, BALCONY_HEIGHT
+    BALCONY_HEIGHT,
+    BALCONY_WIDTH,
+    DOOR_HEIGHT,
+    DOOR_WIDTH,
+    WALL_HEIGHT, WALL_THICKNESS,
+    WINDOW_HEIGHT, WINDOW_SILL,
+    WINDOW_WIDTH
 } from '../config/constants.js';
+import { createFloorTexture, createWallTexture } from './textures.js';
 
 const THREE = window.THREE;
 
-export const createRoomObjects = (room, floorMaterial, ceilingMaterial, offsetX, offsetZ) => {
+// 텍스처 캐시 (같은 재질의 텍스처를 재사용)
+const floorTextureCache = new Map();
+const wallTextureCache = new Map();
+
+/**
+ * 바닥 재질 생성 (캐싱 적용)
+ */
+const getFloorMaterial = (materialId = 'wood_oak') => {
+    if (!floorTextureCache.has(materialId)) {
+        const texture = createFloorTexture(materialId);
+        const material = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+        });
+        floorTextureCache.set(materialId, material);
+    }
+    return floorTextureCache.get(materialId);
+};
+
+/**
+ * 벽 재질 생성 (캐싱 적용)
+ */
+const getWallMaterial = (materialId = 'white') => {
+    if (!wallTextureCache.has(materialId)) {
+        const texture = createWallTexture(materialId);
+        const material = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.4,      // 낮춰서 색상이 더 선명하게
+            metalness: 0.0,     // 금속성 제거
+            emissive: 0x111111, // 약간의 자체 발광으로 어두운 곳에서도 색상 보임
+            emissiveIntensity: 0.1
+        });
+        wallTextureCache.set(materialId, material);
+    }
+    return wallTextureCache.get(materialId);
+};
+
+export const createRoomObjects = (room, defaultFloorMaterial, ceilingMaterial, offsetX, offsetZ) => {
     if (room.points.length < 3) return null;
 
     const shape = new THREE.Shape();
@@ -17,8 +61,9 @@ export const createRoomObjects = (room, floorMaterial, ceilingMaterial, offsetX,
     shape.lineTo(room.points[0].x + offsetX, room.points[0].y + offsetZ);
     const geometry = new THREE.ShapeGeometry(shape);
 
-    // 방 바닥에 텍스처 적용 (캐싱된 재질 사용)
-    const material = floorMaterial;
+    // 방의 개별 바닥재 적용 (없으면 기본 재질 사용)
+    const floorMaterialId = room.floorMaterialId || 'wood_oak';
+    const material = getFloorMaterial(floorMaterialId);
 
     // UV 매핑 조정 (텍스처 스케일)
     const posAttribute = geometry.attributes.position;
@@ -58,14 +103,16 @@ export const createRoomObjects = (room, floorMaterial, ceilingMaterial, offsetX,
     return { floorMesh, ceilingMesh };
 };
 
-export const createWallObjects = (wall, index, openings, wallMaterial, offsetX, offsetZ) => {
+export const createWallObjects = (wall, index, openings, defaultWallMaterial, offsetX, offsetZ) => {
     const wallOpenings = openings.filter(o => o.wallIndex === index);
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const len = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
 
-    const wallMat = wallMaterial;
+    // 벽의 개별 재질 적용 (없으면 기본 재질 사용)
+    const wallMaterialId = wall.materialId || 'white';
+    const wallMat = getWallMaterial(wallMaterialId);
     const doors = [];
     let mesh = null;
 
