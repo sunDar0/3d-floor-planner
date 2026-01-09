@@ -28,3 +28,23 @@ export const projectPointOnLine = (point, start, end) => {
         t: t // 비율 (0~1)
     };
 };
+
+/**
+ * 점이 폴리곤 내부에 있는지 확인 (Ray Casting 알고리즘)
+ */
+export const isPointInPolygon = (x, y, points) => {
+    if (!points || points.length < 3) return false;
+    
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const xi = points[i].x, yi = points[i].y;
+        const xj = points[j].x, yj = points[j].y;
+        
+        const intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        
+        if (intersect) inside = !inside;
+    }
+    
+    return inside;
+};
