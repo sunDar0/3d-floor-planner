@@ -170,6 +170,10 @@ export const WALL_MATERIALS = [
     { id: 'stripe_beige', label: '스트라이프 베이지', color: '#faf8f5', pattern: 'stripe', stripeColor: '#ebe5d9' },
     { id: 'brick', label: '벽돌', color: '#c9785d', pattern: 'brick' },
     { id: 'concrete', label: '콘크리트', color: '#9e9e9e', pattern: 'concrete' },
+    {id: 'british_green', label: '영국 그린', color: '#004225', pattern: 'solid' },
+    {id: 'deep_green', label: '딥 그린', color: '#084732', pattern: 'solid' },
+    {id: 'cobalt_blue', label: '코발트 블루', color: '#00498c', pattern: 'solid' },
+    {id:'prussian_blue', label: '프러시안 블루', color: '#003458', pattern: 'solid' },
 ];
 
 // 바닥재 재질 옵션
