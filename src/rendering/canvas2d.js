@@ -1,6 +1,11 @@
 import {
-    VISUAL_GRID_SIZE, DOOR_WIDTH, WINDOW_WIDTH, BALCONY_WIDTH, FURNITURE_TEMPLATES,
-    WALL_MATERIALS, FLOOR_MATERIALS
+    BALCONY_WIDTH,
+    DOOR_WIDTH,
+    FLOOR_MATERIALS,
+    FURNITURE_TEMPLATES,
+    VISUAL_GRID_SIZE,
+    WALL_MATERIALS,
+    WINDOW_WIDTH
 } from '../config/constants.js';
 import { distance } from '../utils/geometry.js';
 
@@ -18,9 +23,13 @@ const getWallColor = (materialId) => {
 };
 
 /**
- * 방 그리기
+ * 방 그리기 (room 객체 또는 points 배열 지원)
  */
-export const drawRoom = (ctx, points, isPreview = false, scale, floorMaterialId = null) => {
+export const drawRoom = (ctx, roomOrPoints, isPreview = false, scale, floorMaterialId = null, isSelected = false) => {
+    // room 객체인 경우 points 추출, 배열인 경우 그대로 사용
+    const points = Array.isArray(roomOrPoints) ? roomOrPoints : roomOrPoints.points;
+    const materialId = Array.isArray(roomOrPoints) ? floorMaterialId : (roomOrPoints.floorMaterialId || floorMaterialId);
+    
     if (points.length < 2) return;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -29,31 +38,33 @@ export const drawRoom = (ctx, points, isPreview = false, scale, floorMaterialId 
     }
     if (!isPreview) ctx.closePath();
 
-    // 재질 색상 적용
+    // 재질 색상 적용 (단순 색상만, 패턴 없음)
     if (isPreview) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
-    } else if (floorMaterialId) {
-        const baseColor = getFloorColor(floorMaterialId);
-        ctx.fillStyle = baseColor + 'aa'; // 투명도 추가
+        ctx.fillStyle = "rgba(59, 130, 246, 0.3)";
+    } else if (materialId) {
+        const baseColor = getFloorColor(materialId);
+        ctx.fillStyle = baseColor + (isSelected ? 'ee' : 'cc');
     } else {
-        ctx.fillStyle = "rgba(224, 231, 255, 0.5)";
+        ctx.fillStyle = "rgba(224, 231, 255, 0.7)";
     }
     ctx.fill();
-    ctx.strokeStyle = isPreview ? "blue" : "#a5b4fc";
-    ctx.lineWidth = 2 / scale;
+    
+    // 선택 시 테두리 강조
+    ctx.strokeStyle = isSelected ? "#2563eb" : (isPreview ? "blue" : "#6366f1");
+    ctx.lineWidth = (isSelected ? 4 : 2) / scale;
     ctx.stroke();
 
     points.forEach(p => {
         ctx.beginPath();
-        ctx.fillStyle = "blue";
-        ctx.arc(p.x, p.y, 3 / scale, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? "#2563eb" : "#4f46e5";
+        ctx.arc(p.x, p.y, (isSelected ? 6 : 4) / scale, 0, Math.PI * 2);
         ctx.fill();
     });
 
     // 방 치수선 표시 (각 변의 길이)
     if (points.length > 1) {
-        ctx.fillStyle = "#6b7280";
-        ctx.font = `${10 / scale}px sans-serif`;
+        ctx.fillStyle = "#374151";
+        ctx.font = `bold ${11 / scale}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
@@ -64,39 +75,72 @@ export const drawRoom = (ctx, points, isPreview = false, scale, floorMaterialId 
             if (dist > 20) {
                 const midX = (p1.x + p2.x) / 2;
                 const midY = (p1.y + p2.y) / 2;
-                ctx.fillText(`${Math.round(dist)}`, midX, midY);
+                // 배경 박스 그리기
+                ctx.save();
+                ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                const text = `${Math.round(dist)}`;
+                const textWidth = ctx.measureText(text).width;
+                ctx.fillRect(midX - textWidth/2 - 2, midY - 6/scale, textWidth + 4, 12/scale);
+                ctx.restore();
+                ctx.fillStyle = "#374151";
+                ctx.fillText(text, midX, midY);
             }
         }
     }
 };
 
 /**
- * 벽 그리기
+ * 벽 그리기 (벽 객체의 개별 재질 지원, 선택 상태 표시)
  */
-export const drawWall = (ctx, wall, color, scale, isGuide = false, wallMaterialId = null) => {
-    ctx.beginPath();
-    // 재질 색상 적용
-    if (wallMaterialId && !isGuide) {
-        ctx.strokeStyle = getWallColor(wallMaterialId);
-    } else {
-        ctx.strokeStyle = color;
-    }
-    ctx.lineWidth = (isGuide ? 2 : 4) / scale;
-    ctx.lineCap = "round";
-    ctx.moveTo(wall.start.x, wall.start.y);
-    ctx.lineTo(wall.end.x, wall.end.y);
-    ctx.stroke();
-
-    ctx.fillStyle = "#3b82f6";
-    ctx.beginPath();
-    ctx.arc(wall.start.x, wall.start.y, 4 / scale, 0, Math.PI * 2);
-    ctx.arc(wall.end.x, wall.end.y, 4 / scale, 0, Math.PI * 2);
-    ctx.fill();
-
+export const drawWall = (ctx, wall, color, scale, isGuide = false, defaultMaterialId = null, isSelected = false) => {
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const len = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    
+    // 벽의 개별 재질 색상 적용 (없으면 기본값 사용)
+    const materialId = wall.materialId || defaultMaterialId;
+    const material = WALL_MATERIALS.find(m => m.id === materialId);
+    const wallColor = material ? material.color : (color || '#9ca3af');
+    
+    // 벽 두께
+    const wallThickness = isGuide ? 4 : 12;
+    
+    // 벽을 두꺼운 사각형으로 그리기
+    ctx.save();
+    ctx.translate(wall.start.x, wall.start.y);
+    ctx.rotate(angle);
+    
+    // 벽 배경 (재질 색상, 단순 색상만)
+    ctx.beginPath();
+    ctx.rect(0, -wallThickness / 2 / scale, len, wallThickness / scale);
+    
+    if (isSelected) {
+        ctx.fillStyle = "#dbeafe";
+    } else if (isGuide) {
+        ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+    } else {
+        ctx.fillStyle = wallColor;
+    }
+    ctx.fill();
+    
+    // 벽 테두리
+    ctx.strokeStyle = isSelected ? "#2563eb" : (isGuide ? "#ef4444" : "#374151");
+    ctx.lineWidth = (isSelected ? 3 : 1.5) / scale;
+    ctx.stroke();
+    
+    ctx.restore();
 
+    // 끝점 핸들
+    ctx.fillStyle = isSelected ? "#2563eb" : "#3b82f6";
+    ctx.beginPath();
+    ctx.arc(wall.start.x, wall.start.y, (isSelected ? 7 : 5) / scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(wall.end.x, wall.end.y, (isSelected ? 7 : 5) / scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 치수 표시
     if (len > 5) {
         const midX = (wall.start.x + wall.end.x) / 2;
         const midY = (wall.start.y + wall.end.y) / 2;
@@ -104,22 +148,25 @@ export const drawWall = (ctx, wall, color, scale, isGuide = false, wallMaterialI
         ctx.save();
         ctx.translate(midX, midY);
 
-        let angle = Math.atan2(dy, dx);
-        if (angle > Math.PI / 2) angle -= Math.PI;
-        else if (angle < -Math.PI / 2) angle += Math.PI;
+        let textAngle = Math.atan2(dy, dx);
+        if (textAngle > Math.PI / 2) textAngle -= Math.PI;
+        else if (textAngle < -Math.PI / 2) textAngle += Math.PI;
 
-        ctx.rotate(angle);
+        ctx.rotate(textAngle);
 
         const fontSize = Math.max(12 / scale, 8);
         ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = "#4b5563";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
 
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 3 / scale;
+        // 배경 박스
         const text = Math.round(len) + " cm";
-        ctx.strokeText(text, 0, -4 / scale);
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.fillRect(-textWidth/2 - 3, -fontSize - 6/scale, textWidth + 6, fontSize + 2);
+        
+        // 텍스트
+        ctx.fillStyle = isSelected ? "#1d4ed8" : "#374151";
         ctx.fillText(text, 0, -4 / scale);
 
         ctx.restore();
