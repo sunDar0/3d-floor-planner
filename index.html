@@ -43,7 +43,7 @@
       WALL_MATERIALS, FLOOR_MATERIALS
     } from './src/config/constants.js';
 
-    import { snapToGrid, distance, projectPointOnLine } from './src/utils/geometry.js';
+    import { snapToGrid, distance, projectPointOnLine, isPointInPolygon } from './src/utils/geometry.js';
     import { getSnappedPosition } from './src/utils/snap.js';
     import { checkCollision } from './src/utils/collision.js';
     import { createFloorTexture, createWallTexture, createCeilingTexture } from './src/rendering/textures.js';
@@ -62,7 +62,8 @@
 
 
     // --- 3D 뷰어 컴포넌트 ---
-    const Viewer3D = ({ walls, rooms, openings, furniture = [], wallMaterialId = 'white', floorMaterialId = 'wood_oak' }) => {
+    // 각 벽/방의 개별 재질을 사용하도록 변경 (wallMaterialId, floorMaterialId props 제거)
+    const Viewer3D = ({ walls, rooms, openings, furniture = [] }) => {
       const mountRef = useRef(null);
       const [isFPV, setIsFPV] = useState(false);
       const [gender, setGender] = useState('male'); // 'male' | 'female'
@@ -88,23 +89,7 @@
         direction: new THREE.Vector3()
       });
 
-      // useMemo로 텍스처 및 재질 캐싱
-      const floorTexture = useMemo(() => createFloorTexture(floorMaterialId), [floorMaterialId]);
-      const wallTexture = useMemo(() => createWallTexture(wallMaterialId), [wallMaterialId]);
-
-      const floorMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-        map: floorTexture,
-        roughness: 0.8,
-        metalness: 0.1,
-        side: THREE.DoubleSide
-      }), [floorTexture]);
-
-      const wallMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-        map: wallTexture,
-        roughness: 0.9,
-        color: 0xffffff
-      }), [wallTexture]);
-
+      // 천장 재질만 공통으로 사용 (벽/바닥은 sceneBuilder에서 개별 처리)
       const ceilingTexture = useMemo(() => createCeilingTexture(), []);
       const ceilingMaterial = useMemo(() => new THREE.MeshStandardMaterial({
         map: ceilingTexture,
@@ -139,10 +124,10 @@
         rendererRef.current = renderer;
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // 0.1 -> 0.02 (거의 암흑)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // 벽 색상이 잘 보이도록 밝게
         scene.add(ambientLight);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.02); // 0.1 -> 0.02
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3); // 반구 조명도 밝게
         hemiLight.position.set(0, 200, 0);
         scene.add(hemiLight);
 
@@ -178,9 +163,10 @@
         const offsetX = -window.innerWidth / 2;
         const offsetZ = -window.innerHeight / 2;
 
-        // Build Scene Objects
+        // Build Scene Objects (각 벽/방의 개별 재질 적용)
         rooms.forEach(room => {
-          const result = createRoomObjects(room, floorMaterial, ceilingMaterial, offsetX, offsetZ);
+          // createRoomObjects 내부에서 room.floorMaterialId를 사용
+          const result = createRoomObjects(room, null, ceilingMaterial, offsetX, offsetZ);
           if (result) {
             scene.add(result.floorMesh);
             if (result.ceilingMesh) {
@@ -191,7 +177,8 @@
         });
 
         walls.forEach((wall, index) => {
-          const result = createWallObjects(wall, index, openings, wallMaterial, offsetX, offsetZ);
+          // createWallObjects 내부에서 wall.materialId를 사용
+          const result = createWallObjects(wall, index, openings, null, offsetX, offsetZ);
           if (result.mesh) {
             scene.add(result.mesh);
           }
@@ -361,7 +348,7 @@
           document.removeEventListener('keydown', onKeyDown);
           document.removeEventListener('keyup', onKeyUp);
         };
-      }, [walls, rooms, openings, furniture, wallMaterialId, floorMaterialId, floorMaterial, wallMaterial, ceilingMaterial]);
+      }, [walls, rooms, openings, furniture, ceilingMaterial]);
 
       // Mode Switching Effect
       useEffect(() => {
@@ -647,6 +634,10 @@
       const [selectedFurnitureId, setSelectedFurnitureId] = useState(null);
       const [isDraggingFurniture, setIsDraggingFurniture] = useState(false);
 
+      // 벽/방 선택 상태
+      const [selectedWallIndex, setSelectedWallIndex] = useState(null);
+      const [selectedRoomIndex, setSelectedRoomIndex] = useState(null);
+
       // 뷰포트 상태 (줌 & 팬)
       const [scale, setScale] = useState(1);
       const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -656,9 +647,40 @@
       // 스마트 가이드 상태
       const [guides, setGuides] = useState([]); // [{ type: 'x'|'y', pos: number, start: number, end: number }]
 
-      // 재질 선택 상태
-      const [wallMaterialId, setWallMaterialId] = useState('white');
-      const [floorMaterialId, setFloorMaterialId] = useState('wood_oak');
+      // 재질 선택 상태 (새 벽/방 생성 시 기본값으로 사용)
+      const [defaultWallMaterialId, setDefaultWallMaterialId] = useState('white');
+      const [defaultFloorMaterialId, setDefaultFloorMaterialId] = useState('wood_oak');
+
+      // 선택된 벽/방의 재질 변경 함수
+      const changeWallMaterial = (materialId) => {
+        if (selectedWallIndex !== null && walls[selectedWallIndex]) {
+          const updatedWalls = walls.map((wall, idx) =>
+            idx === selectedWallIndex ? { ...wall, materialId } : wall
+          );
+          pushState({ ...state, walls: updatedWalls });
+        } else {
+          setDefaultWallMaterialId(materialId);
+        }
+      };
+
+      const changeFloorMaterial = (materialId) => {
+        if (selectedRoomIndex !== null && rooms[selectedRoomIndex]) {
+          const updatedRooms = rooms.map((room, idx) =>
+            idx === selectedRoomIndex ? { ...room, floorMaterialId: materialId } : room
+          );
+          pushState({ ...state, rooms: updatedRooms });
+        } else {
+          setDefaultFloorMaterialId(materialId);
+        }
+      };
+
+      // 현재 활성화된 재질 (선택된 객체의 재질 또는 기본값)
+      const currentWallMaterialId = selectedWallIndex !== null && walls[selectedWallIndex]
+        ? (walls[selectedWallIndex].materialId || 'white')
+        : defaultWallMaterialId;
+      const currentFloorMaterialId = selectedRoomIndex !== null && rooms[selectedRoomIndex]
+        ? (rooms[selectedRoomIndex].floorMaterialId || 'wood_oak')
+        : defaultFloorMaterialId;
 
       const canvasRef = useRef(null);
 
@@ -724,6 +746,11 @@
         setPreviewOpening(null);
         setPreviewFurniture(null);
         setSelectedFurnitureId(null);
+        // 벽/방 선택은 select 도구일 때만 유지
+        if (tool !== 'select') {
+          setSelectedWallIndex(null);
+          setSelectedRoomIndex(null);
+        }
       }, [tool]);
 
       // --- 데이터 저장/로드 (LocalStorage & File) ---
@@ -814,10 +841,13 @@
         // 그리드 그리기
         drawGrid(ctx, canvas, scale, pan);
 
-        // 1. 방 그리기
-        rooms.forEach(room => drawRoom(ctx, room.points, false, scale, floorMaterialId));
+        // 1. 방 그리기 (각 방의 개별 재질 적용)
+        rooms.forEach((room, idx) => {
+          const isSelected = selectedRoomIndex === idx;
+          drawRoom(ctx, room, false, scale, null, isSelected);
+        });
         if (currentRoom.length > 0) {
-          drawRoom(ctx, currentRoom, true, scale);
+          drawRoom(ctx, currentRoom, true, scale, defaultFloorMaterialId);
           ctx.beginPath();
           ctx.strokeStyle = "blue";
           ctx.setLineDash([5 / scale, 5 / scale]);
@@ -827,9 +857,12 @@
           ctx.setLineDash([]);
         }
 
-        // 2. 벽 그리기
-        walls.forEach(wall => drawWall(ctx, wall, 'black', scale, false, wallMaterialId));
-        if (currentWall) drawWall(ctx, currentWall, 'red', scale, true);
+        // 2. 벽 그리기 (각 벽의 개별 재질 적용)
+        walls.forEach((wall, idx) => {
+          const isSelected = selectedWallIndex === idx;
+          drawWall(ctx, wall, 'black', scale, false, null, isSelected);
+        });
+        if (currentWall) drawWall(ctx, currentWall, 'red', scale, true, defaultWallMaterialId);
 
         // 3. 오프닝 그리기
         openings.forEach(op => drawOpening(ctx, op, walls, scale));
@@ -864,7 +897,7 @@
 
         ctx.restore();
 
-      }, [walls, rooms, openings, furniture, currentWall, currentRoom, previewOpening, previewFurniture, mode, scale, pan, guides]);
+      }, [walls, rooms, openings, furniture, currentWall, currentRoom, previewOpening, previewFurniture, mode, scale, pan, guides, selectedWallIndex, selectedRoomIndex, defaultWallMaterialId, defaultFloorMaterialId]);
 
 
 
@@ -906,7 +939,7 @@
         const y = snapped.y;
 
         if (tool === 'select') {
-          // 가구 선택 로직 (MouseDown에서 처리)
+          // 1. 먼저 가구 선택 시도
           let clickedFurnitureId = null;
           for (let i = furniture.length - 1; i >= 0; i--) {
             const item = furniture[i];
@@ -930,12 +963,50 @@
 
           if (clickedFurnitureId) {
             setSelectedFurnitureId(clickedFurnitureId);
+            setSelectedWallIndex(null);
+            setSelectedRoomIndex(null);
             setIsDraggingFurniture(true);
-            // 드래그 시작 시 미리보기 설정 (선택적)
             const item = furniture.find(f => f.id === clickedFurnitureId);
             setPreviewFurniture({ ...item });
+            return;
+          }
+
+          // 2. 방(바닥) 선택 시도 (점이 방 폴리곤 내부에 있는지 확인)
+          let clickedRoomIndex = null;
+          for (let i = rooms.length - 1; i >= 0; i--) {
+            const room = rooms[i];
+            if (room.points && isPointInPolygon(worldPos.x, worldPos.y, room.points)) {
+              clickedRoomIndex = i;
+              break;
+            }
+          }
+
+          // 3. 벽 선택 시도 (벽에 가까운지 확인)
+          let clickedWallIndex = null;
+          const wallThreshold = 15 / scale; // 벽에서 15px 이내
+          for (let i = walls.length - 1; i >= 0; i--) {
+            const wall = walls[i];
+            const proj = projectPointOnLine(worldPos, wall.start, wall.end);
+            const dist = distance(worldPos, proj);
+            if (dist < wallThreshold && proj.t >= 0 && proj.t <= 1) {
+              clickedWallIndex = i;
+              break;
+            }
+          }
+
+          // 벽이 선택되면 벽 우선, 아니면 방 선택
+          if (clickedWallIndex !== null) {
+            setSelectedWallIndex(clickedWallIndex);
+            setSelectedRoomIndex(null);
+            setSelectedFurnitureId(null);
+          } else if (clickedRoomIndex !== null) {
+            setSelectedRoomIndex(clickedRoomIndex);
+            setSelectedWallIndex(null);
+            setSelectedFurnitureId(null);
           } else {
             setSelectedFurnitureId(null);
+            setSelectedWallIndex(null);
+            setSelectedRoomIndex(null);
           }
         } else if (tool === 'wall') {
           setCurrentWall({ start: { x, y }, end: { x, y } });
@@ -1062,12 +1133,14 @@
             // 닫힌 영역(방) 감지
             const newRoomPoints = findClosedRegion(walls, currentWall);
 
-            const newWalls = [...walls, currentWall];
+            // 벽에 재질 정보 포함
+            const wallWithMaterial = { ...currentWall, materialId: defaultWallMaterialId };
+            const newWalls = [...walls, wallWithMaterial];
             let newRooms = rooms;
 
             if (newRoomPoints) {
-              // 방이 감지되면 자동으로 추가
-              newRooms = [...rooms, { points: newRoomPoints }];
+              // 방이 감지되면 자동으로 추가 (바닥 재질 포함)
+              newRooms = [...rooms, { points: newRoomPoints, floorMaterialId: defaultFloorMaterialId }];
             }
 
             pushState({
@@ -1081,7 +1154,7 @@
           if (currentRoom[0].x !== currentRoom[2].x || currentRoom[0].y !== currentRoom[2].y) {
             pushState({
               ...state,
-              rooms: [...rooms, { points: currentRoom, hasCeiling: false }]
+              rooms: [...rooms, { points: currentRoom, hasCeiling: false, floorMaterialId: defaultFloorMaterialId }]
             });
           }
           setCurrentRoom([]);
@@ -1166,22 +1239,22 @@
                     </div>
                   </div>
 
-                  {/* 재질 선택 패널 - 벽 또는 방 도구 선택 시에만 표시 */}
-                  {(tool === 'wall' || tool === 'room') && (
+                  {/* 재질 선택 패널 - 벽/방 도구 선택 시 또는 벽/방이 선택되었을 때 표시 */}
+                  {(tool === 'wall' || tool === 'room' || selectedWallIndex !== null || selectedRoomIndex !== null) && (
                     <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-56 pointer-events-auto">
-                      <h4 className="font-bold text-gray-800 text-xs mb-3 flex items-center">
-                        <span className="mr-2">🎨</span>
-                        {tool === 'wall' ? '벽지 선택' : '바닥재 선택'}
-                      </h4>
-
-                      {tool === 'wall' ? (
+                      {/* 선택된 벽이 있을 때 또는 벽 도구 사용 시 */}
+                      {(tool === 'wall' || selectedWallIndex !== null) && (
                         <>
+                          <h4 className="font-bold text-gray-800 text-xs mb-3 flex items-center">
+                            <span className="mr-2">🧱</span>
+                            {selectedWallIndex !== null ? '선택된 벽 재질' : '새 벽 기본 재질'}
+                          </h4>
                           <div className="grid grid-cols-4 gap-2">
                             {WALL_MATERIALS.map(mat => (
                               <button
                                 key={mat.id}
-                                onClick={() => setWallMaterialId(mat.id)}
-                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${wallMaterialId === mat.id
+                                onClick={() => changeWallMaterial(mat.id)}
+                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${currentWallMaterialId === mat.id
                                   ? 'border-blue-500 bg-blue-50'
                                   : 'border-gray-200 hover:border-gray-400'
                                   }`}
@@ -1198,17 +1271,32 @@
                             ))}
                           </div>
                           <p className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-100">
-                            현재: <strong>{WALL_MATERIALS.find(m => m.id === wallMaterialId)?.label}</strong>
+                            {selectedWallIndex !== null 
+                              ? <><span className="text-blue-600">✓ 벽 #{selectedWallIndex + 1}</span> - <strong>{WALL_MATERIALS.find(m => m.id === currentWallMaterialId)?.label}</strong></>
+                              : <>기본: <strong>{WALL_MATERIALS.find(m => m.id === currentWallMaterialId)?.label}</strong></>
+                            }
                           </p>
                         </>
-                      ) : (
+                      )}
+
+                      {/* 벽과 방 둘 다 표시될 때 구분선 */}
+                      {(tool === 'wall' || selectedWallIndex !== null) && (tool === 'room' || selectedRoomIndex !== null) && (
+                        <div className="border-t border-gray-200 my-3"></div>
+                      )}
+
+                      {/* 선택된 방이 있을 때 또는 방 도구 사용 시 */}
+                      {(tool === 'room' || selectedRoomIndex !== null) && (
                         <>
+                          <h4 className="font-bold text-gray-800 text-xs mb-3 flex items-center">
+                            <span className="mr-2">⬛</span>
+                            {selectedRoomIndex !== null ? '선택된 바닥 재질' : '새 바닥 기본 재질'}
+                          </h4>
                           <div className="grid grid-cols-4 gap-2">
                             {FLOOR_MATERIALS.map(mat => (
                               <button
                                 key={mat.id}
-                                onClick={() => setFloorMaterialId(mat.id)}
-                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${floorMaterialId === mat.id
+                                onClick={() => changeFloorMaterial(mat.id)}
+                                className={`flex flex-col items-center p-1.5 rounded-lg border-2 transition-all ${currentFloorMaterialId === mat.id
                                   ? 'border-blue-500 bg-blue-50'
                                   : 'border-gray-200 hover:border-gray-400'
                                   }`}
@@ -1225,7 +1313,10 @@
                             ))}
                           </div>
                           <p className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-100">
-                            현재: <strong>{FLOOR_MATERIALS.find(m => m.id === floorMaterialId)?.label}</strong>
+                            {selectedRoomIndex !== null 
+                              ? <><span className="text-blue-600">✓ 바닥 #{selectedRoomIndex + 1}</span> - <strong>{FLOOR_MATERIALS.find(m => m.id === currentFloorMaterialId)?.label}</strong></>
+                              : <>기본: <strong>{FLOOR_MATERIALS.find(m => m.id === currentFloorMaterialId)?.label}</strong></>
+                            }
                           </p>
                         </>
                       )}
@@ -1235,83 +1326,51 @@
               </div>
             ) : (
               <>
-                <Viewer3D walls={walls} rooms={rooms} openings={openings} furniture={furniture} wallMaterialId={wallMaterialId} floorMaterialId={floorMaterialId} />
-                {/* 재질 선택 패널 */}
-                <div className="absolute top-6 left-6 bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-72 z-20 max-h-[80vh] overflow-y-auto">
-                  <h3 className="font-bold text-gray-800 text-sm mb-4 flex items-center">
-                    <span className="mr-2">🎨</span> 재질 변경
+                <Viewer3D walls={walls} rooms={rooms} openings={openings} furniture={furniture} />
+                {/* 재질 안내 패널 */}
+                <div className="absolute top-6 left-6 bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 w-72 z-20">
+                  <h3 className="font-bold text-gray-800 text-sm mb-3 flex items-center">
+                    <span className="mr-2">🎨</span> 재질 정보
                   </h3>
-
-                  {/* 벽지 선택 */}
-                  <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-gray-600 mb-2">벽지</h4>
-                    <div className="grid grid-cols-4 gap-2">
-                      {WALL_MATERIALS.map(mat => (
-                        <button
-                          key={mat.id}
-                          onClick={() => setWallMaterialId(mat.id)}
-                          className={`w-full aspect-square rounded-lg border-2 transition-all ${wallMaterialId === mat.id
-                            ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
-                            : 'border-gray-200 hover:border-gray-400'
-                            }`}
-                          style={{ backgroundColor: mat.color }}
-                          title={mat.label}
-                        >
-                          {mat.pattern === 'stripe' && (
-                            <div className="w-full h-full flex">
-                              <div className="w-1/2 h-full" style={{ backgroundColor: mat.stripeColor }}></div>
-                            </div>
-                          )}
-                          {mat.pattern === 'brick' && (
-                            <div className="w-full h-full flex flex-wrap">
-                              <div className="w-full h-1/3 border-b border-gray-400"></div>
-                              <div className="w-1/2 h-1/3 border-r border-t border-gray-400"></div>
-                              <div className="w-1/2 h-1/3 border-t border-gray-400"></div>
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      {WALL_MATERIALS.find(m => m.id === wallMaterialId)?.label}
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      <strong>💡 Tip:</strong> 2D 편집기에서 벽이나 바닥을 클릭하여 선택한 후 재질을 변경할 수 있습니다.
                     </p>
                   </div>
 
-                  {/* 바닥재 선택 */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-600 mb-2">바닥재</h4>
-                    <div className="grid grid-cols-4 gap-2">
-                      {FLOOR_MATERIALS.map(mat => (
-                        <button
-                          key={mat.id}
-                          onClick={() => setFloorMaterialId(mat.id)}
-                          className={`w-full aspect-square rounded-lg border-2 transition-all ${floorMaterialId === mat.id
-                            ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
-                            : 'border-gray-200 hover:border-gray-400'
-                            }`}
-                          style={{ backgroundColor: mat.color }}
-                          title={mat.label}
-                        >
-                          {mat.pattern === 'wood' && (
-                            <div className="w-full h-full flex flex-col justify-evenly">
-                              {[...Array(4)].map((_, i) => (
-                                <div key={i} className="w-full h-0.5" style={{ backgroundColor: mat.grainColor, opacity: 0.5 }}></div>
-                              ))}
-                            </div>
-                          )}
-                          {mat.pattern === 'tile' && (
-                            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px" style={{ backgroundColor: mat.groutColor }}>
-                              {[...Array(4)].map((_, i) => (
-                                <div key={i} style={{ backgroundColor: mat.color }}></div>
-                              ))}
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                  {/* 사용된 벽지 목록 */}
+                  <div className="mb-3">
+                    <h4 className="text-xs font-semibold text-gray-600 mb-2">사용된 벽지</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {[...new Set(walls.map(w => w.materialId || 'white'))].map(matId => {
+                        const mat = WALL_MATERIALS.find(m => m.id === matId);
+                        return mat ? (
+                          <div key={matId} className="flex items-center bg-gray-100 rounded px-2 py-1">
+                            <div className="w-4 h-4 rounded mr-1" style={{ backgroundColor: mat.color }}></div>
+                            <span className="text-[10px] text-gray-600">{mat.label}</span>
+                          </div>
+                        ) : null;
+                      })}
+                      {walls.length === 0 && <span className="text-[10px] text-gray-400">벽 없음</span>}
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      {FLOOR_MATERIALS.find(m => m.id === floorMaterialId)?.label}
-                    </p>
+                  </div>
+
+                  {/* 사용된 바닥재 목록 */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-600 mb-2">사용된 바닥재</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {[...new Set(rooms.map(r => r.floorMaterialId || 'wood_oak'))].map(matId => {
+                        const mat = FLOOR_MATERIALS.find(m => m.id === matId);
+                        return mat ? (
+                          <div key={matId} className="flex items-center bg-gray-100 rounded px-2 py-1">
+                            <div className="w-4 h-4 rounded mr-1" style={{ backgroundColor: mat.color }}></div>
+                            <span className="text-[10px] text-gray-600">{mat.label}</span>
+                          </div>
+                        ) : null;
+                      })}
+                      {rooms.length === 0 && <span className="text-[10px] text-gray-400">방 없음</span>}
+                    </div>
                   </div>
                 </div>
               </>
