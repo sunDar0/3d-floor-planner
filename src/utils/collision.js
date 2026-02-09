@@ -4,20 +4,18 @@ import { WALL_THICKNESS, DOOR_WIDTH, BALCONY_WIDTH } from '../config/constants.j
 /**
  * 플레이어와 벽 충돌 감지
  * 문/발코니 통과 가능 여부 확인
- * 
+ *
  * @param {number} x - 플레이어 X 좌표
  * @param {number} z - 플레이어 Z 좌표
  * @param {Array} walls - 벽 배열
  * @param {Array} openings - 오프닝 배열
+ * @param {number} offsetX - X축 오프셋 (3D 좌표 변환용)
+ * @param {number} offsetZ - Z축 오프셋 (3D 좌표 변환용)
  * @returns {boolean} 충돌 여부
  */
-export const checkCollision = (x, z, walls, openings) => {
+export const checkCollision = (x, z, walls, openings, offsetX, offsetZ) => {
     const PLAYER_RADIUS = 30; // 30cm 몸통 반지름
     const THRESHOLD = WALL_THICKNESS / 2 + PLAYER_RADIUS;
-
-    // 오프셋 (중앙 정렬)
-    const offsetX = -window.innerWidth / 2;
-    const offsetZ = -window.innerHeight / 2;
 
     const px = x - offsetX;
     const pz = z - offsetZ;
