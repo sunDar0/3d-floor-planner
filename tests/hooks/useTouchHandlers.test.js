@@ -1,5 +1,5 @@
-import React from 'react';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '@testing-library/react';
 import { useTouchHandlers } from '../../src/hooks/useTouchHandlers.js';
 
 describe('useTouchHandlers', () => {
@@ -40,11 +40,11 @@ describe('useTouchHandlers', () => {
     expect(result.current.isTwoFingerGesture()).toBe(false);
   });
 
-  test('two-finger touch start initializes pinch state', () => {
+  test('two-finger touch start initializes pinch state', async () => {
     const props = defaultProps();
     const { result } = renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [
         { x: 100, y: 100 },
         { x: 200, y: 200 }
@@ -55,11 +55,11 @@ describe('useTouchHandlers', () => {
     expect(result.current.isTwoFingerGesture()).toBe(true);
   });
 
-  test('single touch does not trigger two-finger gesture', () => {
+  test('single touch does not trigger two-finger gesture', async () => {
     const props = defaultProps();
     const { result } = renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [{ x: 100, y: 100 }]);
     });
 
@@ -67,18 +67,18 @@ describe('useTouchHandlers', () => {
     expect(result.current.isTwoFingerGesture()).toBe(false);
   });
 
-  test('pinch zoom out (fingers apart) increases scale', () => {
+  test('pinch zoom out (fingers apart) increases scale', async () => {
     const props = defaultProps();
     renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [
         { x: 100, y: 100 },
         { x: 200, y: 200 }
       ]);
     });
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchmove', [
         { x: 50, y: 50 },
         { x: 250, y: 250 }
@@ -91,18 +91,18 @@ describe('useTouchHandlers', () => {
     expect(newScale).toBeGreaterThan(1);
   });
 
-  test('pinch zoom in (fingers closer) decreases scale', () => {
+  test('pinch zoom in (fingers closer) decreases scale', async () => {
     const props = defaultProps();
     renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [
         { x: 50, y: 50 },
         { x: 250, y: 250 }
       ]);
     });
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchmove', [
         { x: 100, y: 100 },
         { x: 200, y: 200 }
@@ -113,11 +113,11 @@ describe('useTouchHandlers', () => {
     expect(newScale).toBeLessThan(1);
   });
 
-  test('touch end resets two-finger gesture state', () => {
+  test('touch end resets two-finger gesture state', async () => {
     const props = defaultProps();
     const { result } = renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [
         { x: 100, y: 100 },
         { x: 200, y: 200 }
@@ -126,7 +126,7 @@ describe('useTouchHandlers', () => {
 
     expect(result.current.isTwoFingerGesture()).toBe(true);
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchend', []);
     });
 
@@ -134,19 +134,19 @@ describe('useTouchHandlers', () => {
     expect(props.setIsPanning).toHaveBeenCalledWith(false);
   });
 
-  test('scale is clamped between 0.1 and 5', () => {
+  test('scale is clamped between 0.1 and 5', async () => {
     const props = { ...defaultProps(), scale: 4.5 };
     props.canvasRef = canvasRef;
     renderHook(() => useTouchHandlers(props));
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchstart', [
         { x: 100, y: 100 },
         { x: 200, y: 200 }
       ]);
     });
 
-    act(() => {
+    await act(async () => {
       dispatchTouch('touchmove', [
         { x: 0, y: 0 },
         { x: 1000, y: 1000 }

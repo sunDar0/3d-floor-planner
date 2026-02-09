@@ -1,5 +1,5 @@
-import React from 'react';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '@testing-library/react';
 import { useIsMobile } from '../../src/hooks/useIsMobile.js';
 
 describe('useIsMobile', () => {
@@ -35,11 +35,10 @@ describe('useIsMobile', () => {
 
   test('returns isTouchDevice based on ontouchstart presence', () => {
     const { result } = renderHook(() => useIsMobile());
-    // In jsdom, ontouchstart is not present by default
     expect(typeof result.current.isTouchDevice).toBe('boolean');
   });
 
-  test('updates isMobile on window resize', () => {
+  test('updates isMobile on window resize', async () => {
     Object.defineProperty(window, 'innerWidth', {
       value: 1024,
       writable: true,
@@ -48,7 +47,7 @@ describe('useIsMobile', () => {
     const { result } = renderHook(() => useIsMobile());
     expect(result.current.isMobile).toBe(false);
 
-    act(() => {
+    await act(async () => {
       Object.defineProperty(window, 'innerWidth', {
         value: 500,
         writable: true,

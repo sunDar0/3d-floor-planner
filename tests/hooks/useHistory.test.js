@@ -1,5 +1,5 @@
-import React from 'react';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '@testing-library/react';
 import { useHistory } from '../../src/hooks/useHistory.js';
 
 describe('useHistory', () => {
@@ -10,10 +10,10 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('pushState adds to history and moves index forward', () => {
+  test('pushState adds to history and moves index forward', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
@@ -22,14 +22,14 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('undo moves back to previous state', () => {
+  test('undo moves back to previous state', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.undo();
     });
 
@@ -38,18 +38,18 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(true);
   });
 
-  test('redo moves forward after undo', () => {
+  test('redo moves forward after undo', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.undo();
     });
 
-    act(() => {
+    await act(async () => {
       result.current.redo();
     });
 
@@ -57,10 +57,10 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('undo does not go below index 0', () => {
+  test('undo does not go below index 0', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.undo();
     });
 
@@ -68,14 +68,14 @@ describe('useHistory', () => {
     expect(result.current.canUndo).toBe(false);
   });
 
-  test('redo does not go beyond last state', () => {
+  test('redo does not go beyond last state', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.redo();
     });
 
@@ -83,45 +83,43 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('pushState after undo truncates redo history', () => {
+  test('pushState after undo truncates redo history', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'c' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.undo();
     });
 
-    // Now at 'b', redo would go to 'c'
     expect(result.current.canRedo).toBe(true);
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'd' });
     });
 
-    // 'c' should be truncated, now history is [a, b, d]
     expect(result.current.state).toEqual({ value: 'd' });
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('reset clears history with new state', () => {
+  test('reset clears history with new state', async () => {
     const { result } = renderHook(() => useHistory({ value: 'a' }));
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'b' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.pushState({ value: 'c' });
     });
 
-    act(() => {
+    await act(async () => {
       result.current.reset({ value: 'fresh' });
     });
 
@@ -130,23 +128,23 @@ describe('useHistory', () => {
     expect(result.current.canRedo).toBe(false);
   });
 
-  test('multiple undo/redo cycles work correctly', () => {
+  test('multiple undo/redo cycles work correctly', async () => {
     const { result } = renderHook(() => useHistory(0));
 
-    act(() => { result.current.pushState(1); });
-    act(() => { result.current.pushState(2); });
-    act(() => { result.current.pushState(3); });
+    await act(async () => { result.current.pushState(1); });
+    await act(async () => { result.current.pushState(2); });
+    await act(async () => { result.current.pushState(3); });
 
     expect(result.current.state).toBe(3);
 
-    act(() => { result.current.undo(); });
-    act(() => { result.current.undo(); });
+    await act(async () => { result.current.undo(); });
+    await act(async () => { result.current.undo(); });
     expect(result.current.state).toBe(1);
 
-    act(() => { result.current.redo(); });
+    await act(async () => { result.current.redo(); });
     expect(result.current.state).toBe(2);
 
-    act(() => { result.current.redo(); });
+    await act(async () => { result.current.redo(); });
     expect(result.current.state).toBe(3);
   });
 });
