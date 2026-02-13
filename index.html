@@ -1539,7 +1539,10 @@
         }
 
         const worldPos = screenToWorld(e.clientX, e.clientY);
-        const snapped = getSnappedPositionWrapper(worldPos.x, worldPos.y);
+        const isFurnitureTool = FURNITURE_TEMPLATES[tool] || customFurnitureDims.current;
+        const snapped = isFurnitureTool
+          ? { x: snapToGrid(worldPos.x), y: snapToGrid(worldPos.y) }
+          : getSnappedPositionWrapper(worldPos.x, worldPos.y);
         const x = snapped.x;
         const y = snapped.y;
 
@@ -1650,8 +1653,11 @@
         }
 
         const worldPos = screenToWorld(e.clientX, e.clientY);
-
-        const snapped = getSnappedPositionWrapper(worldPos.x, worldPos.y);
+        const isFurnitureTool = FURNITURE_TEMPLATES[tool] || customFurnitureDims.current;
+        const isDraggingFurn = tool === 'select' && isDraggingFurniture;
+        const snapped = (isFurnitureTool || isDraggingFurn)
+          ? { x: snapToGrid(worldPos.x), y: snapToGrid(worldPos.y), guides: [] }
+          : getSnappedPositionWrapper(worldPos.x, worldPos.y);
         const x = snapped.x;
         const y = snapped.y;
 
