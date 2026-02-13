@@ -1,15 +1,15 @@
-import { FURNITURE_TEMPLATES, WALL_HEIGHT } from '../config/constants.js';
+import { WALL_HEIGHT, getEffectiveDimensions } from '../config/constants.js';
 
 const THREE = window.THREE;
 
 export const createFurnitureGroup = (item, offsetX, offsetZ) => {
-    const template = FURNITURE_TEMPLATES[item.type];
-    if (!template) return null;
+    const dims = getEffectiveDimensions(item);
+    if (!dims) return null;
 
     const group = new THREE.Group();
     group.position.set(item.x + offsetX, 0, item.y + offsetZ);
     group.rotation.y = -item.rotation;
-    const { width, depth, height, color } = template;
+    const { width, depth, height, color } = dims;
 
     // 가구 재질 (Standard Material)
     const furnitureMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });

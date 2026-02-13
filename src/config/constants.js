@@ -170,7 +170,7 @@ export const WALL_MATERIALS = [
     { id: 'stripe_beige', label: '스트라이프 베이지', color: '#faf8f5', pattern: 'stripe', stripeColor: '#ebe5d9' },
     { id: 'brick', label: '벽돌', color: '#c9785d', pattern: 'brick' },
     { id: 'concrete', label: '콘크리트', color: '#9e9e9e', pattern: 'concrete' },
-    {id: 'british_green', label: '영국 그린', color: '#004225', pattern: 'solid' },
+    {id: 'british_green', label: '브리티쉬 그린', color: '#004225', pattern: 'solid' },
     {id: 'deep_green', label: '딥 그린', color: '#084732', pattern: 'solid' },
     {id: 'cobalt_blue', label: '코발트 블루', color: '#00498c', pattern: 'solid' },
     {id:'prussian_blue', label: '프러시안 블루', color: '#003458', pattern: 'solid' },
@@ -191,3 +191,49 @@ export const FLOOR_MATERIALS = [
     { id: 'marble_black', label: '블랙 마블', color: '#424242', pattern: 'marble', veinColor: '#757575' },
     { id: 'polished_concrete', label: '폴리싱 콘크리트', color: '#9e9e9e', pattern: 'concrete' },
 ];
+
+/**
+ * 커스텀 가구 생성용 가구 종류 목록
+ * baseType: furnitureBuilder.js의 타입 감지 로직에 매칭되는 타입 문자열
+ */
+export const CUSTOM_FURNITURE_TYPES = [
+    { id: 'bed', label: '침대', icon: '🛏️', baseType: 'bed_custom', defaultWidth: 150, defaultDepth: 200, defaultHeight: 50 },
+    { id: 'sofa', label: '소파', icon: '🛋️', baseType: 'sofa_custom', defaultWidth: 180, defaultDepth: 80, defaultHeight: 85 },
+    { id: 'desk', label: '책상', icon: '🪑', baseType: 'desk', defaultWidth: 150, defaultDepth: 70, defaultHeight: 75 },
+    { id: 'bookshelf', label: '책장', icon: '📚', baseType: 'bookshelf_custom', defaultWidth: 80, defaultDepth: 30, defaultHeight: 200 },
+    { id: 'wardrobe', label: '옷장', icon: '👔', baseType: 'wardrobe', defaultWidth: 90, defaultDepth: 60, defaultHeight: 200 },
+    { id: 'dining_table', label: '식탁', icon: '🍽️', baseType: 'dining_table_custom', defaultWidth: 120, defaultDepth: 80, defaultHeight: 75 },
+    { id: 'fridge', label: '냉장고', icon: '🧊', baseType: 'fridge', defaultWidth: 70, defaultDepth: 70, defaultHeight: 180 },
+    { id: 'tv_stand', label: 'TV장', icon: '📺', baseType: 'tv_stand', defaultWidth: 120, defaultDepth: 40, defaultHeight: 50 },
+    { id: 'bathtub', label: '욕조', icon: '🛁', baseType: 'bathtub', defaultWidth: 80, defaultDepth: 170, defaultHeight: 60 },
+    { id: 'washbasin', label: '세면대', icon: '🚿', baseType: 'washbasin', defaultWidth: 60, defaultDepth: 45, defaultHeight: 85 },
+    { id: 'toilet', label: '변기', icon: '🚽', baseType: 'toilet', defaultWidth: 40, defaultDepth: 65, defaultHeight: 40 },
+    { id: 'sink_unit', label: '싱크대', icon: '🚰', baseType: 'sink_unit', defaultWidth: 80, defaultDepth: 60, defaultHeight: 85 },
+    { id: 'stove_unit', label: '가스레인지', icon: '🔥', baseType: 'stove_unit', defaultWidth: 60, defaultDepth: 60, defaultHeight: 85 },
+    { id: 'light', label: '조명', icon: '💡', baseType: 'light_led_room', defaultWidth: 50, defaultDepth: 50, defaultHeight: 5 },
+];
+
+/**
+ * 가구 아이템의 유효 치수를 반환 (커스텀 치수가 있으면 우선 적용)
+ */
+export const getEffectiveDimensions = (item) => {
+    const template = FURNITURE_TEMPLATES[item.type];
+    // 커스텀 가구: 템플릿에 없지만 customWidth/customDepth/customHeight가 있는 경우
+    if (!template && item.customWidth) {
+        return {
+            width: item.customWidth,
+            depth: item.customDepth,
+            height: item.customHeight,
+            color: item.customColor ?? 0x9ca3af,
+            label: item.customLabel ?? '커스텀',
+        };
+    }
+    if (!template) return null;
+    return {
+        width: item.customWidth ?? template.width,
+        depth: item.customDepth ?? template.depth,
+        height: item.customHeight ?? template.height,
+        color: template.color,
+        label: template.label,
+    };
+};

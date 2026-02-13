@@ -5,7 +5,8 @@ import {
     FURNITURE_TEMPLATES,
     VISUAL_GRID_SIZE,
     WALL_MATERIALS,
-    WINDOW_WIDTH
+    WINDOW_WIDTH,
+    getEffectiveDimensions
 } from '../config/constants.js';
 import { distance } from '../utils/geometry.js';
 
@@ -228,8 +229,8 @@ export const drawOpening = (ctx, op, walls, scale, isPreview = false) => {
  * 가구 그리기
  */
 export const drawFurniture = (ctx, item, scale, selectedFurnitureId, isPreview = false) => {
-    const template = FURNITURE_TEMPLATES[item.type];
-    if (!template) return;
+    const dims = getEffectiveDimensions(item);
+    if (!dims) return;
 
     const isSelected = item.id === selectedFurnitureId;
 
@@ -237,7 +238,7 @@ export const drawFurniture = (ctx, item, scale, selectedFurnitureId, isPreview =
     ctx.translate(item.x, item.y);
     ctx.rotate(item.rotation);
 
-    const { width, depth, label } = template;
+    const { width, depth, label } = dims;
 
     ctx.beginPath();
     ctx.rect(-width / 2, -depth / 2, width, depth);

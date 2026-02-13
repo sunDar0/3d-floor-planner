@@ -160,7 +160,7 @@
       GRID_SIZE, VISUAL_GRID_SIZE, WALL_THICKNESS, WALL_HEIGHT,
       DOOR_WIDTH, DOOR_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_SILL,
       BALCONY_WIDTH, BALCONY_HEIGHT, HEIGHT_MALE, HEIGHT_FEMALE,
-      TOOLS, FURNITURE_CATEGORIES, FURNITURE_TEMPLATES,
+      TOOLS, FURNITURE_CATEGORIES, FURNITURE_TEMPLATES, CUSTOM_FURNITURE_TYPES, getEffectiveDimensions,
       WALL_MATERIALS, FLOOR_MATERIALS
     } from './src/config/constants.js';
 
@@ -213,6 +213,97 @@
               >
                 확인
               </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const CustomFurnitureModal = ({ onConfirm, onCancel }) => {
+      const [selectedKind, setSelectedKind] = React.useState(null);
+      const [dims, setDims] = React.useState({ width: '', depth: '', height: '' });
+      const [error, setError] = React.useState('');
+
+      const handleKindSelect = (kind) => {
+        setSelectedKind(kind);
+        setDims({ width: String(kind.defaultWidth), depth: String(kind.defaultDepth), height: String(kind.defaultHeight) });
+        setError('');
+      };
+
+      const handleConfirm = () => {
+        if (!selectedKind) { setError('가구 종류를 선택해주세요.'); return; }
+        const w = parseInt(dims.width, 10), d = parseInt(dims.depth, 10), h = parseInt(dims.height, 10);
+        if (isNaN(w) || isNaN(d) || isNaN(h)) { setError('치수를 올바르게 입력해주세요.'); return; }
+        if (w < 10 || d < 10 || h < 5) { setError('최소 크기: 가로/세로 10cm, 높이 5cm'); return; }
+        if (w > 500 || d > 500 || h > 300) { setError('최대 크기: 가로/세로 500cm, 높이 300cm'); return; }
+        onConfirm({
+          type: selectedKind.baseType,
+          customWidth: w,
+          customDepth: d,
+          customHeight: h,
+          customLabel: selectedKind.label,
+        });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onCancel}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'left' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '16px' }}>가구 만들기</h3>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>종류 선택</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {CUSTOM_FURNITURE_TYPES.map(kind => (
+                  <button key={kind.id} onClick={() => handleKindSelect(kind)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '10px 4px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                      background: selectedKind?.id === kind.id ? '#3b82f6' : '#f3f4f6',
+                      color: selectedKind?.id === kind.id ? 'white' : '#4b5563',
+                      transition: 'all 0.15s',
+                    }}>
+                    <span style={{ fontSize: '22px', lineHeight: 1 }}>{kind.icon}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '500', marginTop: '4px' }}>{kind.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedKind && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>치수 입력 (cm)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  {[
+                    { key: 'width', label: '가로(W)' },
+                    { key: 'depth', label: '세로(D)' },
+                    { key: 'height', label: '높이(H)' },
+                  ].map(({ key, label }) => (
+                    <div key={key}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>{label}</div>
+                      <input type="number" value={dims[key]}
+                        onChange={e => setDims(prev => ({ ...prev, [key]: e.target.value }))}
+                        style={{
+                          width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px',
+                          fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                        }}
+                        onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                        onBlur={e => e.target.style.borderColor = '#d1d5db'}
+                        min="1" max="500" placeholder="cm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {error && <div style={{ fontSize: '12px', color: '#ef4444', marginBottom: '12px' }}>{error}</div>}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={onCancel}
+                className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 font-medium active:bg-gray-300">취소</button>
+              <button onClick={handleConfirm}
+                className="px-6 py-2 rounded-lg bg-blue-500 text-white font-medium active:bg-blue-600"
+                style={{ opacity: selectedKind ? 1 : 0.5 }}>배치</button>
             </div>
           </div>
         </div>
@@ -855,7 +946,7 @@
     };
 
     // --- 툴바 컴포넌트 ---
-    const Toolbar = ({ tool, setTool, undo, redo, canUndo, canRedo, clearAll, mode, setMode, handleFileDownload, handleFileUpload, isMobile }) => {
+    const Toolbar = ({ tool, setTool, undo, redo, canUndo, canRedo, clearAll, mode, setMode, handleFileDownload, handleFileUpload, isMobile, onCustomFurniture }) => {
       const [openCategory, setOpenCategory] = useState(null);
       const toolbarRef = useRef(null);
 
@@ -943,6 +1034,17 @@
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* 커스텀 가구 */}
+            <div className="bg-gray-100/50 p-1.5 rounded-xl border border-gray-200 flex-shrink-0">
+              <button
+                onClick={onCustomFurniture}
+                className="p-1.5 md:p-2 rounded-lg text-xs font-medium transition-all duration-200 flex flex-col items-center justify-center w-9 h-9 md:w-10 md:h-10 active:scale-95 text-gray-600 hover:bg-gray-200/80 hover:text-gray-900"
+                title="커스텀 가구 만들기"
+              >
+                <span className="text-lg leading-none">➕</span>
+              </button>
             </div>
 
             {/* Undo/Redo - hidden on mobile (using FABs instead) */}
@@ -1078,6 +1180,8 @@
       const [tool, setTool] = useState('select');
       const [straightMode, setStraightMode] = useState(false);
       const [showConfirmModal, setShowConfirmModal] = useState(false);
+      const [showCustomFurnitureModal, setShowCustomFurnitureModal] = useState(false);
+      const customFurnitureDims = React.useRef(null);
 
       // Undo/Redo를 위한 통합 상태 관리
       const { state, pushState, undo, redo, reset, canUndo, canRedo } = useHistory({
@@ -1160,6 +1264,17 @@
         return Object.values(FURNITURE_CATEGORIES).flatMap(category => category.items);
       }, []);
 
+      const handleCustomFurnitureConfirm = (config) => {
+        customFurnitureDims.current = {
+          customWidth: config.customWidth,
+          customDepth: config.customDepth,
+          customHeight: config.customHeight,
+          customLabel: config.customLabel,
+        };
+        setTool(config.type);
+        setShowCustomFurnitureModal(false);
+      };
+
       // 단축키 이벤트 핸들러
       useEffect(() => {
         const handleKeyDown = (e) => {
@@ -1204,6 +1319,7 @@
           } else if (e.key === 'Escape') {
             setTool('select');
             setSelectedFurnitureId(null);
+            customFurnitureDims.current = null;
           }
         };
 
@@ -1432,8 +1548,8 @@
           let clickedFurnitureId = null;
           for (let i = furniture.length - 1; i >= 0; i--) {
             const item = furniture[i];
-            const template = FURNITURE_TEMPLATES[item.type];
-            if (!template) continue;
+            const dims = getEffectiveDimensions(item);
+            if (!dims) continue;
 
             const dx = worldPos.x - item.x;
             const dy = worldPos.y - item.y;
@@ -1444,7 +1560,7 @@
             const localX = dx * cos - dy * sin;
             const localY = dx * sin + dy * cos;
 
-            if (Math.abs(localX) <= template.width / 2 && Math.abs(localY) <= template.depth / 2) {
+            if (Math.abs(localX) <= dims.width / 2 && Math.abs(localY) <= dims.depth / 2) {
               clickedFurnitureId = item.id;
               break;
             }
@@ -1509,7 +1625,7 @@
             });
             setPreviewOpening(null);
           }
-        } else if (FURNITURE_TEMPLATES[tool]) {
+        } else if (FURNITURE_TEMPLATES[tool] || customFurnitureDims.current) {
           if (previewFurniture) {
             pushState({
               ...state,
@@ -1605,12 +1721,13 @@
           } else {
             setPreviewOpening(null);
           }
-        } else if (FURNITURE_TEMPLATES[tool]) {
+        } else if (FURNITURE_TEMPLATES[tool] || customFurnitureDims.current) {
           setPreviewFurniture(prev => ({
             type: tool,
             x,
             y,
-            rotation: prev ? prev.rotation : 0
+            rotation: prev ? prev.rotation : 0,
+            ...(customFurnitureDims.current || {})
           }));
         } else if (tool === 'select' && isDraggingFurniture && selectedFurnitureId) {
           // 가구 이동 중 미리보기 업데이트
@@ -1810,6 +1927,7 @@
             handleFileDownload={handleFileDownload}
             handleFileUpload={handleFileUpload}
             isMobile={isMobile}
+            onCustomFurniture={() => setShowCustomFurnitureModal(true)}
           />
 
           <div className="flex-1 relative overflow-hidden">
@@ -1958,6 +2076,13 @@
               message="정말 모두 지우시겠습니까?"
               onConfirm={confirmClearAll}
               onCancel={() => setShowConfirmModal(false)}
+            />
+          )}
+
+          {showCustomFurnitureModal && (
+            <CustomFurnitureModal
+              onConfirm={handleCustomFurnitureConfirm}
+              onCancel={() => setShowCustomFurnitureModal(false)}
             />
           )}
         </div>
